@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryTrek — Твой карманный экскурсовод</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f1a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  .app-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .screen-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .screen-tabs button {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(126,203,189,0.3);
+    background: rgba(126,203,189,0.08);
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .screen-tabs button:hover,
+  .screen-tabs button.active-tab {
+    background: rgba(126,203,189,0.2);
+    color: #7ECBBD;
+    border-color: #7ECBBD;
+  }
+
+  .phone {
+    width: 375px;
+    max-width: 100%;
+    background: #111827;
+    border-radius: 44px;
+    border: 6px solid #1f2937;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05);
+    position: relative;
+  }
+
+  .notch {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 120px; height: 28px;
+    background: #1f2937;
+    border-radius: 0 0 18px 18px;
+    z-index: 10;
+  }
+
+  .screen { display: none; flex-direction: column; min-height: 680px; }
+  .screen.active { display: flex; }
+
+  .status-bar {
+    background: #0d1117;
+    padding: 32px 20px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .status-bar span { color: #fff; font-size: 12px; font-weight: 600; }
+
+  .nav-header {
+    background: #0d1117;
+    padding: 10px 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo { font-size: 20px; font-weight: 700; color: #7ECBBD; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+  .back-btn {
+    width: 34px; height: 34px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #fff; flex-shrink: 0;
+    border: none;
+  }
+  .avatar-btn {
+    width: 34px; height: 34px;
+    background: rgba(126,203,189,0.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-left: auto; border: none;
+    color: #7ECBBD;
+  }
+
+  .content { flex: 1; overflow-y: auto; background: #111827; }
+  .content::-webkit-scrollbar { width: 0; }
+
+  .bottom-nav {
+    background: #0d1117;
+    padding: 10px 10px 20px;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px; cursor: pointer; color: rgba(255,255,255,0.3);
+    font-size: 10px; padding: 4px 8px;
+    border-radius: 10px; transition: color 0.2s; border: none; background: none;
+  }
+  .nav-item.active { color: #7ECBBD; }
+  .nav-item i { font-size: 22px; }
+
+  /* MAP HERO */
+  .hero-map {
+    height: 200px;
+    background: #0a0f1e;
+    position: relative; overflow: hidden;
+  }
+  .map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(126,203,189,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,203,189,0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .map-roads {
+    position: absolute; inset: 0;
+  }
+  .map-route {
+    position: absolute;
+    top: 50%; left: 8%;
+    width: 84%; height: 2px;
+    background: linear-gradient(90deg, transparent, #7ECBBD 20%, #7ECBBD 80%, transparent);
+    transform: translateY(-50%);
+  }
+  .map-route-v {
+    position: absolute;
+    top: 30%; left: 48%;
+    width: 2px; height: 40%;
+    background: linear-gradient(180deg, transparent, #7ECBBD 30%, #E8845C 70%, transparent);
+  }
+  .map-pin {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    transform: translate(-50%, -50%);
+  }
+  .map-pin.start { background: #7ECBBD; top: 50%; left: 10%; }
+  .map-pin.mid   { background: #E8845C; top: 42%; left: 50%; }
+  .map-pin.end   { background: #7ECBBD; top: 50%; left: 88%; }
+  .map-label {
+    position: absolute;
+    font-size: 9px; color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+  .map-overlay {
+    position: absolute; bottom: 12px; left: 12px; right: 12px;
+    background: rgba(0,0,0,0.65);
+    border-radius: 12px; padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+    backdrop-filter: blur(4px);
+  }
+  .map-overlay .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: #7ECBBD; flex-shrink: 0;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  .map-overlay span { color: #fff; font-size: 12px; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(126,203,189,0.4); }
+    50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 0 4px rgba(126,203,189,0); }
+  }
+
+  /* SEARCH */
+  .search-box {
+    margin: 14px;
+    background: #1c2533;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 11px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .search-box i { color: rgba(255,255,255,0.35); font-size: 18px; }
+  .search-box input {
+    flex: 1; border: none; background: transparent;
+    font-size: 14px; color: #fff; outline: none;
+  }
+  .search-box input::placeholder { color: rgba(255,255,255,0.3); }
+
+  /* SECTION */
+  .section-title {
+    padding: 4px 14px 10px;
+    font-size: 11px; font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  /* TOUR CARDS */
+  .tour-cards { padding: 0 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .tour-card {
+    background: #1c2533;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .tour-card:hover { border-color: rgba(126,203,189,0.3); transform: translateY(-1px); }
+  .tour-card:active { transform: scale(0.99); }
+
+  .tour-thumb {
+    width: 54px; height: 54px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+  }
+  .tour-thumb.teal { background: rgba(126,203,189,0.12); }
+  .tour-thumb.coral { background: rgba(232,132,92,0.12); }
+  .tour-thumb.blue  { background: rgba(59,130,246,0.12); }
+
+  .tour-info { flex: 1; min-width: 0; }
+  .tour-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+  .tour-meta { font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 7px; }
+  .tour-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+  .tag.teal  { background: rgba(126,203,189,0.12); color: #7ECBBD; }
+  .tag.coral { background: rgba(232,132,92,0.12);  color: #E8845C; }
+  .tag.blue  { background: rgba(59,130,246,0.12);  color: #60a5fa; }
+  .tour-price { font-size: 13px; font-weight: 700; color: #7ECBBD; white-space: nowrap; }
+
+  /* ACTIVE ROUTE */
+  .active-banner {
+    margin: 14px;
+    background: linear-gradient(135deg, #0d2b25 0%, #0a1f1b 100%);
+    border: 1px solid rgba(126,203,189,0.2);
+    border-radius: 16px; padding: 16px;
+  }
+  .active-banner .label { font-size: 10px; color: rgba(126,203,189,0.6); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+  .active-banner .title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 12px; }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #7ECBBD; border-radius: 2px; transition: width 0.3s; }
+  .progress-label { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; }
+  .controls { display: flex; gap: 8px; }
+  .ctrl-btn {
+    flex: 1; padding: 10px 6px;
+    border-radius: 10px; border: none;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: opacity 0.15s;
+  }
+  .ctrl-btn:active { opacity: 0.7; }
+  .ctrl-btn.primary { background: #7ECBBD; color: #052e28; }
+  .ctrl-btn.secondary { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.7); }
+
+  /* VOICE CARD */
+  .voice-card {
+    margin: 0 14px 14px;
+    background: #1c2533;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 14px;
+  }
+  .voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .voice-header .title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 6px; }
+  .voice-header .link { font-size: 11px; color: #7ECBBD; cursor: pointer; }
+  .waveform { height: 44px; display: flex; align-items: center; gap: 2px; margin-bottom: 10px; }
+  .wave-bar {
+    flex: 1; background: rgba(126,203,189,0.35); border-radius: 1px;
+    animation: wave 1.4s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes wave {
+    0%,100% { transform: scaleY(0.25); opacity: 0.5; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+  .voice-text { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; font-style: italic; }
+
+  /* POI LIST */
+  .poi-list { padding: 0 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .poi-item {
+    background: #1c2533;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .poi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .poi-dot.passed  { background: #7ECBBD; }
+  .poi-dot.current { background: #E8845C; animation: pulse 1.5s infinite; }
+  .poi-dot.upcoming{ background: rgba(255,255,255,0.15); }
+  .poi-name { flex: 1; font-size: 13px; color: rgba(255,255,255,0.75); }
+  .poi-name.current { color: #fff; font-weight: 600; }
+  .poi-dist { font-size: 11px; color: rgba(255,255,255,0.35); }
+  .poi-dist.now { color: #E8845C; font-weight: 600; }
+
+  /* DETAIL */
+  .detail-hero {
+    height: 170px;
+    background: #0a0f1e;
+    position: relative; overflow: hidden;
+    padding: 48px 20px 18px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .detail-hero .map-grid { opacity: 0.5; }
+  .detail-hero .detail-title { font-size: 22px; font-weight: 700; color: #fff; position: relative; z-index: 1; }
+  .detail-hero .detail-sub   { font-size: 12px; color: rgba(255,255,255,0.5); position: relative; z-index: 1; margin-top: 4px; }
+
+  .detail-stats {
+    margin: 14px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-pill {
+    background: #1c2533;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 10px 8px; text-align: center;
+  }
+  .stat-pill .val { font-size: 17px; font-weight: 700; color: #fff; }
+  .stat-pill .lbl { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+  .tab-row {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: #111827;
+    padding: 0 14px;
+    margin-bottom: 14px;
+  }
+  .tab-item {
+    padding: 12px 14px 10px;
+    font-size: 13px; font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.2s;
+  }
+  .tab-item.active { color: #7ECBBD; border-bottom-color: #7ECBBD; }
+
+  .detail-desc { margin: 0 14px 14px; font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.65; }
+
+  .voice-select {
+    margin: 0 14px 14px;
+    background: #1c2533;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 12px;
+  }
+  .voice-select .label { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 10px; }
+  .voice-options { display: flex; gap: 6px; }
+  .voice-option {
+    flex: 1; padding: 10px 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: center; cursor: pointer;
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    transition: all 0.2s; background: transparent;
+  }
+  .voice-option.selected {
+    border-color: #7ECBBD;
+    background: rgba(126,203,189,0.1);
+    color: #7ECBBD;
+  }
+  .voice-option i { font-size: 20px; display: block; margin-bottom: 4px; }
+  .voice-option .vname { font-weight: 600; font-size: 11px; }
+
+  .start-btn {
+    margin: 0 14px 20px;
+    width: calc(100% - 28px);
+    padding: 15px;
+    background: #7ECBBD;
+    color: #052e28;
+    border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .start-btn:hover { opacity: 0.9; }
+  .start-btn:active { transform: scale(0.98); }
+
+  /* ONBOARDING */
+  .onboard {
+    flex: 1; background: #0d1117;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 28px; text-align: center;
+  }
+  .icon-circle {
+    width: 90px; height: 90px;
+    background: rgba(126,203,189,0.1);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+    border: 1px solid rgba(126,203,189,0.2);
+  }
+  .icon-circle i { font-size: 40px; color: #7ECBBD; }
+  .onboard h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 10px; line-height: 1.3; }
+  .onboard p  { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.65; margin-bottom: 32px; }
+  .dots { display: flex; gap: 6px; margin-bottom: 32px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: all 0.3s; }
+  .dot.active { background: #7ECBBD; width: 20px; border-radius: 3px; }
+  .big-btn {
+    width: 100%; padding: 15px;
+    background: #7ECBBD; color: #052e28;
+    border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: opacity 0.2s;
+  }
+  .big-btn:hover { opacity: 0.9; }
+  .skip-btn {
+    background: none; border: none;
+    color: rgba(255,255,255,0.3); font-size: 13px;
+    cursor: pointer; padding: 8px;
+  }
+
+  /* PROFILE */
+  .profile-header {
+    background: #0d1117;
+    padding: 28px 20px 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .avatar {
+    width: 54px; height: 54px;
+    background: rgba(126,203,189,0.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #7ECBBD;
+    border: 1px solid rgba(126,203,189,0.2);
+  }
+  .profile-header .pname { font-size: 16px; font-weight: 600; color: #fff; }
+  .profile-header .pplan { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+  .pro-badge {
+    margin-left: auto;
+    background: rgba(126,203,189,0.12);
+    border-radius: 8px; padding: 5px 12px;
+    font-size: 12px; font-weight: 700; color: #7ECBBD;
+    border: 1px solid rgba(126,203,189,0.2);
+  }
+
+  .settings-list { padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .settings-item {
+    background: #1c2533;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 13px 14px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .settings-item:hover { border-color: rgba(255,255,255,0.12); }
+  .settings-item .sicon { font-size: 18px; color: rgba(255,255,255,0.35); }
+  .settings-item .stext { flex: 1; font-size: 13px; color: rgba(255,255,255,0.75); }
+  .settings-item .sval  { font-size: 12px; color: rgba(255,255,255,0.3); }
+  .settings-item .schev { font-size: 16px; color: rgba(255,255,255,0.2); }
+  .settings-item.danger .stext { color: #f87171; }
+  .settings-item.danger .sicon { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+  <div class="screen-tabs">
+    <button onclick="showScreen('onboard')" id="tab-onboard" class="active-tab">👋 Онбординг</button>
+    <button onclick="showScreen('home')"    id="tab-home">🏠 Главная</button>
+    <button onclick="showScreen('active')"  id="tab-active">🗺️ Маршрут</button>
+    <button onclick="showScreen('detail')"  id="tab-detail">🎙️ Экскурсия</button>
+    <button onclick="showScreen('profile')" id="tab-profile">👤 Профиль</button>
+  </div>
+
+  <div class="phone">
+    <div class="notch"></div>
+
+    <!-- ===== ONBOARDING ===== -->
+    <div id="screen-onboard" class="screen active" style="background:#0d1117;">
+      <div class="onboard">
+        <div class="icon-circle">
+          <i class="ti ti-map-2"></i>
+        </div>
+        <h2>Твой карманный экскурсовод</h2>
+        <p>Яндекс Карты + ИИ-голос Алисы рассказывает истории о местах прямо во время вашей прогулки</p>
+        <div class="dots">
+          <div class="dot active"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+        <button class="big-btn" onclick="showScreen('home')">
+          Начать <i class="ti ti-arrow-right"></i>
+        </button>
+        <button class="skip-btn" onclick="showScreen('home')">Пропустить</button>
+      </div>
+    </div>
+
+    <!-- ===== HOME ===== -->
+    <div id="screen-home" class="screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>StoryTrek</span>
+        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
+      </div>
+      <div class="nav-header">
+        <div>
+          <div class="logo">StoryTrek</div>
+          <div class="logo-sub">Твой карманный экскурсовод</div>
+        </div>
+        <button class="avatar-btn" onclick="showScreen('profile')" aria-label="Профиль">
+          <i class="ti ti-user" style="font-size:16px;"></i>
+        </button>
+      </div>
+      <div class="content">
+        <div class="hero-map">
+          <div class="map-grid"></div>
+          <div class="map-route"></div>
+          <div class="map-route-v"></div>
+          <div class="map-pin start"></div>
+          <div class="map-pin mid"></div>
+          <div class="map-pin end"></div>
+          <div class="map-overlay">
+            <div class="pulse"></div>
+            <span>Москва · Исторический центр</span>
+          </div>
+        </div>
+        <div class="search-box">
+          <i class="ti ti-search"></i>
+          <input type="text" placeholder="Найти маршрут, город, место...">
+        </div>
+        <div class="section-title">Популярные маршруты</div>
+        <div class="tour-cards">
+          <div class="tour-card" onclick="showScreen('detail')">
+            <div class="tour-thumb teal">🏛️</div>
+            <div class="tour-info">
+              <div class="tour-name">Арбат и окрестности</div>
+              <div class="tour-meta">Москва · 3.2 км · ~1.5 ч</div>
+              <div class="tour-tags">
+                <span class="tag teal">История</span>
+                <span class="tag coral">Архитектура</span>
+              </div>
+            </div>
+            <div class="tour-price">₽149</div>
+          </div>
+          <div class="tour-card" onclick="showScreen('detail')">
+            <div class="tour-thumb coral">⛩️</div>
+            <div class="tour-info">
+              <div class="tour-name">Красная площадь</div>
+              <div class="tour-meta">Москва · 1.8 км · ~50 мин</div>
+              <div class="tour-tags">
+                <span class="tag coral">Иконическое</span>
+                <span class="tag blue">Бесплатно</span>
+              </div>
+            </div>
+            <div class="tour-price">Бесп.</div>
+          </div>
+          <div class="tour-card" onclick="showScreen('detail')">
+            <div class="tour-thumb blue">🌉</div>
+            <div class="tour-info">
+              <div class="tour-name">Набережная Невы</div>
+              <div class="tour-meta">СПб · 4.5 км · ~2 ч</div>
+              <div class="tour-tags">
+                <span class="tag blue">Природа</span>
+                <span class="tag teal">Вечер</span>
+              </div>
+            </div>
+            <div class="tour-price">₽199</div>
+          </div>
+          <div style="height:16px;"></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <button class="nav-item active" onclick="showScreen('home')">
+          <i class="ti ti-home"></i><span>Главная</span>
+        </button>
+        <button class="nav-item" onclick="showScreen('active')">
+          <i class="ti ti-route"></i><span>Маршруты</span>
+        </button>
+        <button class="nav-item">
+          <i class="ti ti-heart"></i><span>Избранное</span>
+        </button>
+        <button class="nav-item" onclick="showScreen('profile')">
+          <i class="ti ti-user"></i><span>Профиль</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== ACTIVE ROUTE ===== -->
+    <div id="screen-active" class="screen">
+      <div class="status-bar" style="background:#0d1117;">
+        <span>10:12</span>
+        <span style="color:#7ECBBD;">● В эфире</span>
+        <span><i class="ti ti-wifi" style="font-size:14px;color:#fff;"></i></span>
+      </div>
+      <div class="nav-header">
+        <button class="back-btn" onclick="showScreen('home')" aria-label="Назад">
+          <i class="ti ti-arrow-left" style="font-size:16px;"></i>
+        </button>
+        <div>
+          <div class="logo" style="font-size:15px;">Арбат и окрестности</div>
+          <div class="logo-sub">Яндекс Навигатор активен</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="hero-map" style="height:160px;">
+          <div class="map-grid"></div>
+          <div class="map-route"></div>
+          <div class="map-pin start"></div>
+          <div class="map-pin mid" style="background:#E8845C; animation:pulse 1.5s infinite;"></div>
+          <div class="map-pin end"></div>
+          <div style="position:absolute;top:12px;right:12px;background:rgba(232,132,92,0.85);border-radius:8px;padding:4px 10px;font-size:11px;color:#fff;font-weight:600;">● Вы здесь</div>
+        </div>
+        <div class="active-banner">
+          <div class="label">Активный маршрут</div>
+          <div class="title">Арбат и окрестности</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill" style="width:42%;"></div></div>
+            <div class="progress-label">42% · 1.8 км осталось</div>
+          </div>
+          <div class="controls">
+            <button class="ctrl-btn primary"><i class="ti ti-player-pause"></i> Пауза</button>
+            <button class="ctrl-btn secondary"><i class="ti ti-map"></i> Карта</button>
+            <button class="ctrl-btn secondary" onclick="showScreen('home')"><i class="ti ti-x"></i> Стоп</button>
+          </div>
+        </div>
+        <div class="voice-card">
+          <div class="voice-header">
+            <div class="title"><i class="ti ti-speakerphone" style="font-size:16px;color:#7ECBBD;"></i> Алиса рассказывает</div>
+            <div class="link">Сменить голос</div>
+          </div>
+          <div class="waveform" id="waveform"></div>
+          <div class="voice-text">"Справа от вас — дом № 9 по Арбату. Именно здесь в 1832 году останавливался Александр Пушкин перед своей свадьбой с Натальей Гончаровой..."</div>
+        </div>
+        <div class="section-title">Точки маршрута</div>
+        <div class="poi-list">
+          <div class="poi-item">
+            <div class="poi-dot passed"></div>
+            <div class="poi-name">Начало: Смоленская</div>
+            <div class="poi-dist"><i class="ti ti-check" style="color:#7ECBBD;font-size:14px;"></i></div>
+          </div>
+          <div class="poi-item">
+            <div class="poi-dot passed"></div>
+            <div class="poi-name">Театр им. Вахтангова</div>
+            <div class="poi-dist"><i class="ti ti-check" style="color:#7ECBBD;font-size:14px;"></i></div>
+          </div>
+          <div class="poi-item">
+            <div class="poi-dot current"></div>
+            <div class="poi-name current">Дом Пушкина на Арбате</div>
+            <div class="poi-dist now">сейчас</div>
+          </div>
+          <div class="poi-item">
+            <div class="poi-dot upcoming"></div>
+            <div class="poi-name">Арбатская площадь</div>
+            <div class="poi-dist">0.6 км</div>
+          </div>
+          <div class="poi-item">
+            <div class="poi-dot upcoming"></div>
+            <div class="poi-name">Финиш: Арбатские ворота</div>
+            <div class="poi-dist">1.8 км</div>
+          </div>
+          <div style="height:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DETAIL ===== -->
+    <div id="screen-detail" class="screen">
+      <div class="status-bar">
+        <span>9:41</span><span>StoryTrek</span>
+        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
+      </div>
+      <div class="detail-hero">
+        <div class="map-grid"></div>
+        <div class="map-route"></div>
+        <div class="map-pin start"></div>
+        <div class="map-pin end"></div>
+        <button onclick="showScreen('home')" style="position:absolute;top:40px;left:14px;z-index:2;width:34px;height:34px;background:rgba(0,0,0,0.45);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" aria-label="Назад">
+          <i class="ti ti-arrow-left" style="color:#fff;font-size:16px;"></i>
+        </button>
+        <div class="detail-title">Арбат и окрестности</div>
+        <div class="detail-sub">Москва · ИИ-гид Алиса (Яндекс SpeechKit)</div>
+      </div>
+      <div class="content">
+        <div class="detail-stats">
+          <div class="stat-pill"><div class="val">3.2</div><div class="lbl">км</div></div>
+          <div class="stat-pill"><div class="val">1.5 ч</div><div class="lbl">время</div></div>
+          <div class="stat-pill"><div class="val">₽149</div><div class="lbl">стоимость</div></div>
+        </div>
+        <div class="tab-row">
+          <div class="tab-item active">Описание</div>
+          <div class="tab-item">Точки</div>
+          <div class="tab-item">Отзывы</div>
+        </div>
+        <div class="detail-desc">
+          Прогулка по легендарному Арбату — самой известной пешеходной улице Москвы. ИИ-гид расскажет об архитектуре, исторических событиях и знаменитых жителях прямо во время вашего движения через Яндекс Навигатор.
+        </div>
+        <div style="display:flex;gap:6px;margin: 8px 14px 14px;flex-wrap:wrap;">
+          <span class="tag teal">История</span>
+          <span class="tag coral">Архитектура</span>
+          <span class="tag blue">Пешком</span>
+          <span class="tag teal">Семья</span>
+        </div>
+        <div class="voice-select">
+          <div class="label">Голос гида (Яндекс SpeechKit)</div>
+          <div class="voice-options">
+            <button class="voice-option selected" onclick="selectVoice(this)">
+              <i class="ti ti-microphone"></i>
+              <div class="vname">Алиса</div>
+            </button>
+            <button class="voice-option" onclick="selectVoice(this)">
+              <i class="ti ti-microphone"></i>
+              <div class="vname">Филипп</div>
+            </button>
+            <button class="voice-option" onclick="selectVoice(this)">
+              <i class="ti ti-microphone"></i>
+              <div class="vname">Захар</div>
+            </button>
+          </div>
+        </div>
+        <button class="start-btn" onclick="showScreen('active')">
+          <i class="ti ti-player-play"></i> Запустить маршрут
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== PROFILE ===== -->
+    <div id="screen-profile" class="screen">
+      <div class="status-bar">
+        <span>9:41</span><span>StoryTrek</span>
+        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
+      </div>
+      <div class="profile-header">
+        <div class="avatar">АБ</div>
+        <div>
+          <div class="pname">Андрей Борисов</div>
+          <div class="pplan">Подписка Pro · до 12.2025</div>
+        </div>
+        <div class="pro-badge">Pro</div>
+      </div>
+      <div class="content">
+        <div class="detail-stats">
+          <div class="stat-pill"><div class="val">12</div><div class="lbl">маршрутов</div></div>
+          <div class="stat-pill"><div class="val">34 км</div><div class="lbl">пройдено</div></div>
+          <div class="stat-pill"><div class="val">8.2 ч</div><div class="lbl">аудио</div></div>
+        </div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <i class="ti ti-history sicon"></i>
+            <div class="stext">История маршрутов</div>
+            <i class="ti ti-chevron-right schev"></i>
+          </div>
+          <div class="settings-item">
+            <i class="ti ti-credit-card sicon"></i>
+            <div class="stext">Подписка и оплата</div>
+            <i class="ti ti-chevron-right schev"></i>
+          </div>
+          <div class="settings-item">
+            <i class="ti ti-microphone sicon"></i>
+            <div class="stext">Голос гида по умолчанию</div>
+            <div class="sval">Алиса</div>
+            <i class="ti ti-chevron-right schev"></i>
+          </div>
+          <div class="settings-item">
+            <i class="ti ti-language sicon"></i>
+            <div class="stext">Язык интерфейса</div>
+            <div class="sval">Русский</div>
+            <i class="ti ti-chevron-right schev"></i>
+          </div>
+          <div class="settings-item">
+            <i class="ti ti-map sicon"></i>
+            <div class="stext">Настройки Яндекс Карт</div>
+            <i class="ti ti-chevron-right schev"></i>
+          </div>
+          <div class="settings-item danger">
+            <i class="ti ti-logout sicon"></i>
+            <div class="stext">Выйти</div>
+          </div>
+          <div style="height:10px;"></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <button class="nav-item" onclick="showScreen('home')">
+          <i class="ti ti-home"></i><span>Главная</span>
+        </button>
+        <button class="nav-item" onclick="showScreen('active')">
+          <i class="ti ti-route"></i><span>Маршруты</span>
+        </button>
+        <button class="nav-item">
+          <i class="ti ti-heart"></i><span>Избранное</span>
+        </button>
+        <button class="nav-item active">
+          <i class="ti ti-user"></i><span>Профиль</span>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /phone -->
+</div><!-- /app-wrapper -->
+
+<script>
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.screen-tabs button').forEach(b => b.classList.remove('active-tab'));
+  const t = document.getElementById('tab-' + name);
+  if (t) t.classList.add('active-tab');
+}
+
+function selectVoice(el) {
+  el.closest('.voice-options').querySelectorAll('.voice-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+const wf = document.getElementById('waveform');
+if (wf) {
+  for (let i = 0; i < 30; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'wave-bar';
+    const h = Math.floor(Math.random() * 65) + 20;
+    bar.style.height = h + '%';
+    bar.style.animationDelay = (i * 0.055).toFixed(3) + 's';
+    wf.appendChild(bar);
+  }
+}
+</script>
+</body>
+</html>
