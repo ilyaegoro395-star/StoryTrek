@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <title>StoryTrek</title>
-  <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU" type="text/javascript"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -215,6 +215,35 @@
     .prog-fill { height: 100%; background: #7ECBBD; border-radius: 2px; transition: width 0.6s ease; }
     .prog-label { font-size: 12px; color: rgba(255,255,255,0.35); white-space: nowrap; }
 
+    /* ── My position marker ────────────────────────── */
+    @keyframes pos-pulse {
+      0%   { transform: scale(1);   opacity: 0.7; }
+      70%  { transform: scale(2.4); opacity: 0;   }
+      100% { transform: scale(2.4); opacity: 0;   }
+    }
+    .my-pos-wrap { position: absolute; pointer-events: none; }
+    .my-pos-ripple {
+      position: absolute; left: -10px; top: -10px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(58, 125, 230, 0.4);
+      animation: pos-pulse 2s ease-out infinite;
+    }
+    .my-pos-dot {
+      position: absolute; left: -8px; top: -8px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #3a7de6; border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    }
+
+    /* ── "Use my location" button in first input ────── */
+    .wp-use-loc {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: #7ECBBD; font-size: 16px; padding: 4px;
+      opacity: 0.75; transition: opacity 0.15s;
+    }
+    .wp-use-loc:hover { opacity: 1; }
+
     /* ── FAB (locate me) ────────────────────────────── */
     .fab {
       position: fixed; right: 16px; bottom: 240px; z-index: 50;
@@ -349,12 +378,14 @@ const DEFAULT_ZOOM    = 12;
 // ═══════════════════════════════════════════════════════
 let ymap        = null;
 let multiRoute  = null;
-let userMarker  = null;
-let watchId     = null;
+let userMarker  = null;   // маркер "Я" — постоянный, видит карту всегда
+let navMarker   = null;   // маркер во время навигации (поверх маршрута)
+let posWatchId  = null;   // watchPosition для маркера "Я"
+let navWatchId  = null;   // watchPosition для триггеров навигации
 
-let waypointValues = ['', ''];  // минимум 2 поля
-let routeCoords    = [];        // [[lat,lon], ...] — координаты маршрута
-let guideSegments  = [];        // [{text, triggerCoord, audioBlob}]
+let waypointValues = ['', ''];
+let routeCoords    = [];
+let guideSegments  = [];
 let segIdx         = 0;
 let curAudio       = null;
 let isAudioBusy    = false;
@@ -371,13 +402,40 @@ ymaps.ready(() => {
     controls: ['zoomControl']
   }, { suppressMapOpenBlock: true });
 
-  // Центрируем на пользователе при старте
-  navigator.geolocation?.getCurrentPosition(pos => {
-    ymap.setCenter([pos.coords.latitude, pos.coords.longitude], 14, { duration: 500 });
+  renderWaypoints();
+  startPosWatch();   // сразу начинаем следить за позицией
+});
+
+// ── Постоянный маркер "Я" на карте ──────────────────────
+function startPosWatch() {
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const coord = [pos.coords.latitude, pos.coords.longitude];
+    ymap.setCenter(coord, 15, { duration: 500 });
+    setMyMarker(coord);
   }, () => {});
 
-  renderWaypoints();
-});
+  posWatchId = navigator.geolocation.watchPosition(pos => {
+    const coord = [pos.coords.latitude, pos.coords.longitude];
+    setMyMarker(coord);
+  }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
+}
+
+function setMyMarker(coord) {
+  const tpl = ymaps.templateLayoutFactory.createClass(
+    '<div class="my-pos-wrap"><div class="my-pos-ripple"></div><div class="my-pos-dot"></div></div>'
+  );
+  if (!userMarker) {
+    userMarker = new ymaps.Placemark(coord, {}, {
+      iconLayout: tpl,
+      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
+    });
+    ymap.geoObjects.add(userMarker);
+  } else {
+    userMarker.geometry.setCoordinates(coord);
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 // PANELS
@@ -423,7 +481,9 @@ function renderWaypoints() {
       </div>
       <div class="wp-input-wrap">
         <input class="wp-input" data-idx="${i}" type="text"
-               placeholder="${ph}" value="${escHtml(val)}" autocomplete="off">
+               placeholder="${ph}" value="${escHtml(val)}" autocomplete="off"
+               style="${isStart ? 'padding-right:36px' : ''}">
+        ${isStart ? `<button class="wp-use-loc" onclick="useMyLocation()" title="Использовать моё местоположение">📍</button>` : ''}
         <div class="sug-list" id="sug-${i}"></div>
       </div>
       ${waypointValues.length > 2
@@ -502,16 +562,32 @@ async function buildRoute() {
         boundsAutoApply: true
       }
     );
-    ymap.geoObjects.add(multiRoute);
 
-    await new Promise((res, rej) => {
-      multiRoute.model.events.add('requestsuccess', res);
-      multiRoute.model.events.add('requesterror', rej);
-      setTimeout(() => rej(new Error('timeout')), 18000);
+    // ВАЖНО: слушатели ДО добавления на карту — не пропустим событие
+    await new Promise((resolve, reject) => {
+      let done = false;
+
+      function onOk()  { if (done) return; done = true; resolve(); }
+      function onErr(e){ if (done) return; done = true; reject(e || new Error('requesterror')); }
+
+      multiRoute.model.events.add('requestsuccess', onOk);
+      multiRoute.model.events.add('requesterror',   onErr);
+      // Запасной вариант — события на самом объекте
+      multiRoute.events.add('requestsuccess', onOk);
+      multiRoute.events.add('requesterror',   onErr);
+
+      setTimeout(() => {
+        if (done) return;
+        // Проверяем, вдруг уже готово (например, из кеша)
+        if (multiRoute.getActiveRoute()) { onOk(); return; }
+        onErr(new Error('timeout'));
+      }, 20000);
+
+      ymap.geoObjects.add(multiRoute);
     });
 
     const active = multiRoute.getActiveRoute();
-    if (!active) throw new Error('No route');
+    if (!active) throw new Error('no active route');
 
     const dist = active.properties.get('distance');
     const dur  = active.properties.get('duration');
@@ -520,16 +596,16 @@ async function buildRoute() {
 
     routeCoords = extractCoords(active);
     routeTotalLen = calcLength(routeCoords);
+    console.log('Route coords extracted:', routeCoords.length, 'points');
 
     hideLoading();
     showPanel('confirming');
-
-    // Генерируем гид в фоне
     generateGuide(points, dist?.text, dur?.text);
 
   } catch (e) {
+    console.error('buildRoute error:', e);
     hideLoading();
-    showToast('Не удалось построить маршрут. Проверьте адреса.');
+    showToast('Не удалось построить маршрут. Проверьте адреса или интернет.');
   }
 }
 
@@ -537,16 +613,29 @@ function extractCoords(activeRoute) {
   const coords = [];
   try {
     activeRoute.getPaths().each(path => {
-      path.getSegments().each(seg => {
-        const geo = seg.geometry;
-        if (geo?.getCoordinates) {
-          const pts = geo.getCoordinates();
-          if (Array.isArray(pts) && pts.length) coords.push(...pts);
-        }
-      });
+      // Способ 1: геометрия самого пути
+      try {
+        const pts = path.geometry.getCoordinates();
+        if (Array.isArray(pts) && pts.length) { coords.push(...pts); return; }
+      } catch (_) {}
+
+      // Способ 2: сегменты пути
+      try {
+        path.getSegments().each(seg => {
+          try {
+            const pts = seg.geometry.getCoordinates();
+            if (Array.isArray(pts)) coords.push(...pts);
+          } catch (_) {}
+        });
+      } catch (_) {}
     });
   } catch (_) {}
-  return coords;
+
+  // Убираем дубли
+  return coords.filter((c, i) => {
+    if (i === 0) return true;
+    return c[0] !== coords[i-1][0] || c[1] !== coords[i-1][1];
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -683,38 +772,25 @@ async function startNav() {
 
   segIdx = 0; isPaused = false; isAudioBusy = false;
 
-  // Маркер пользователя
-  userMarker = new ymaps.Placemark(DEFAULT_CENTER, {}, {
-    iconLayout: ymaps.templateLayoutFactory.createClass(
-      '<div style="width:18px;height:18px;background:#7ECBBD;border-radius:50%;border:3px solid #fff;' +
-      'box-shadow:0 0 0 5px rgba(126,203,189,0.25);transform:translate(-9px,-9px);"></div>'
-    ),
-    iconShape: { type: 'Circle', coordinates: [0, 0], radius: 11 }
-  });
-  ymap.geoObjects.add(userMarker);
-
-  // Вейвформ
   buildWaveform();
-
   showPanel('navigating');
-
-  // Запускаем первый фрагмент сразу
   playSegment(0);
 
-  // Геолокация
+  // Навигационный watch (отдельно от маркера "Я")
   if (navigator.geolocation) {
-    watchId = navigator.geolocation.watchPosition(
-      onPosition,
-      err => console.warn('Geo error', err.code, err.message),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 }
+    navWatchId = navigator.geolocation.watchPosition(
+      onNavPosition,
+      err => console.warn('Nav geo error', err.code),
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
     );
   }
 }
 
-function onPosition(pos) {
+function onNavPosition(pos) {
   const coord = [pos.coords.latitude, pos.coords.longitude];
 
-  if (userMarker) userMarker.geometry.setCoordinates(coord);
+  // Двигаем маркер "Я" (тот же userMarker)
+  setMyMarker(coord);
   ymap.panTo(coord, { flying: false, duration: 600 });
 
   // Прогресс
@@ -730,18 +806,16 @@ function onPosition(pos) {
     for (let i = segIdx; i < guideSegments.length; i++) {
       const seg = guideSegments[i];
       if (!seg.triggerCoord) { segIdx = i; playSegment(i); break; }
-      const d = haversine(coord, seg.triggerCoord);
-      if (d < TRIGGER_DIST_M) { segIdx = i; playSegment(i); break; }
+      if (haversine(coord, seg.triggerCoord) < TRIGGER_DIST_M) { segIdx = i; playSegment(i); break; }
     }
   }
 }
 
 function stopNav() {
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (navWatchId !== null) { navigator.geolocation.clearWatch(navWatchId); navWatchId = null; }
   if (curAudio) { curAudio.pause(); curAudio = null; }
   speechSynthesis.cancel();
   isAudioBusy = false; isPaused = false;
-  if (userMarker) { ymap.geoObjects.remove(userMarker); userMarker = null; }
   guideSegments = []; segIdx = 0;
   backToIdle();
 }
@@ -794,10 +868,34 @@ function fmtDist(m) {
 }
 
 function locateMe() {
+  if (userMarker) {
+    const coord = userMarker.geometry.getCoordinates();
+    ymap.panTo(coord, { flying: true });
+    ymap.setZoom(16);
+    return;
+  }
   navigator.geolocation?.getCurrentPosition(
     pos => ymap.panTo([pos.coords.latitude, pos.coords.longitude], { flying: true }),
     () => showToast('Нет доступа к геолокации')
   );
+}
+
+async function useMyLocation() {
+  if (!navigator.geolocation) { showToast('Геолокация недоступна'); return; }
+  showLoading('Определяю местоположение...');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    hideLoading();
+    const coord = [pos.coords.latitude, pos.coords.longitude];
+    try {
+      const res = await ymaps.geocode(coord, { results: 1 });
+      const name = res.geoObjects.get(0)?.getAddressLine() || `${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`;
+      waypointValues[0] = name;
+      renderWaypoints();
+    } catch {
+      waypointValues[0] = `${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`;
+      renderWaypoints();
+    }
+  }, () => { hideLoading(); showToast('Нет доступа к геолокации'); });
 }
 
 function buildWaveform() {
