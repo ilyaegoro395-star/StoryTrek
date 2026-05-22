@@ -376,21 +376,24 @@ const DEFAULT_ZOOM    = 12;
 // ═══════════════════════════════════════════════════════
 // GLOBALS
 // ═══════════════════════════════════════════════════════
-let ymap        = null;
-let multiRoute  = null;
-let userMarker  = null;   // маркер "Я" — постоянный, видит карту всегда
-let navMarker   = null;   // маркер во время навигации (поверх маршрута)
-let posWatchId  = null;   // watchPosition для маркера "Я"
-let navWatchId  = null;   // watchPosition для триггеров навигации
+let ymap       = null;
+let userMarker = null;   // синий кружок "Я" — постоянный
+let posWatchId = null;   // watchPosition для маркера "Я"
+let navWatchId = null;   // watchPosition во время навигации
 
-let waypointValues = ['', ''];
-let routeCoords    = [];
-let guideSegments  = [];
-let segIdx         = 0;
-let curAudio       = null;
-let isAudioBusy    = false;
-let isPaused       = false;
-let routeTotalLen  = 0;
+let waypointValues = ['', ''];   // текст в полях
+let waypointCoords = [null, null]; // {lat,lng} — заполняется из саджеста или геокодинга
+
+let routeCoords   = [];  // [[lat,lng],...] от OSRM
+let routeLine     = null; // ymaps.GeoObject — линия маршрута
+let routeMarkers  = [];   // ymaps.Placemark — точки маршрута
+
+let guideSegments = [];
+let segIdx        = 0;
+let curAudio      = null;
+let isAudioBusy   = false;
+let isPaused      = false;
+let routeTotalLen = 0;
 
 // ═══════════════════════════════════════════════════════
 // MAP INIT
@@ -453,12 +456,14 @@ function showPanel(name) {
 // ═══════════════════════════════════════════════════════
 function addWaypointField() {
   waypointValues.splice(waypointValues.length - 1, 0, '');
+  waypointCoords.splice(waypointCoords.length - 1, 0, null);
   renderWaypoints();
 }
 
 function removeWaypointField(idx) {
   if (waypointValues.length <= 2) return;
   waypointValues.splice(idx, 1);
+  waypointCoords.splice(idx, 1);
   renderWaypoints();
 }
 
@@ -495,6 +500,7 @@ function renderWaypoints() {
     const input = row.querySelector('.wp-input');
     input.addEventListener('input', () => {
       waypointValues[i] = input.value;
+      waypointCoords[i] = null; // сбрасываем кешированные координаты при ручном вводе
       debounceSuggest(i, input.value);
     });
     input.addEventListener('blur', () => setTimeout(() => hideSug(i), 200));
@@ -511,26 +517,30 @@ function debounceSuggest(idx, val) {
 
 async function fetchSug(idx, val) {
   try {
-    const results = await ymaps.suggest(val, { results: 5 });
+    const res  = await fetch(`/api/geocode?q=${encodeURIComponent(val)}`);
+    const data = await res.json();
     const list = document.getElementById('sug-' + idx);
     if (!list) return;
-    if (!results.length) { hideSug(idx); return; }
+    if (!Array.isArray(data) || !data.length) { hideSug(idx); return; }
 
-    list.innerHTML = results
-      .map(r => `<div class="sug-item" data-val="${escAttr(r.value)}">${escHtml(r.displayName)}</div>`)
+    list.innerHTML = data
+      .map(r => `<div class="sug-item"
+                   data-text="${escAttr(r.text)}"
+                   data-lat="${r.lat}"
+                   data-lng="${r.lng}">${escHtml(r.text)}</div>`)
       .join('');
     list.style.display = 'block';
 
     list.querySelectorAll('.sug-item').forEach(item => {
       item.addEventListener('mousedown', e => {
         e.preventDefault();
-        const v = item.dataset.val;
-        waypointValues[idx] = v;
-        document.querySelector(`.wp-input[data-idx="${idx}"]`).value = v;
+        waypointValues[idx] = item.dataset.text;
+        waypointCoords[idx] = { lat: parseFloat(item.dataset.lat), lng: parseFloat(item.dataset.lng) };
+        document.querySelector(`.wp-input[data-idx="${idx}"]`).value = item.dataset.text;
         hideSug(idx);
       });
     });
-  } catch (_) {}
+  } catch (_) { hideSug(idx); }
 }
 
 function hideSug(idx) {
@@ -539,103 +549,96 @@ function hideSug(idx) {
 }
 
 // ═══════════════════════════════════════════════════════
-// ROUTE BUILDING
+// ROUTE BUILDING  (geocode.js + route.js через Netlify)
 // ═══════════════════════════════════════════════════════
 async function buildRoute() {
-  const points = waypointValues.map(v => v.trim()).filter(Boolean);
-  if (points.length < 2) { showToast('Укажите минимум две точки маршрута'); return; }
+  const texts = waypointValues.map(v => v.trim());
+  const filled = texts.filter(Boolean);
+  if (filled.length < 2) { showToast('Укажите минимум две точки маршрута'); return; }
 
   showLoading('Строим маршрут...');
+  clearRouteFromMap();
 
   try {
-    if (multiRoute) { ymap.geoObjects.remove(multiRoute); multiRoute = null; }
+    // 1. Геокодируем точки без координат
+    const coords = waypointValues.map((_, i) => waypointCoords[i] ? { ...waypointCoords[i] } : null);
+    for (let i = 0; i < texts.length; i++) {
+      if (!texts[i]) continue;
+      if (coords[i]) continue; // уже есть координаты из саджеста
 
-    multiRoute = new ymaps.multiRouter.MultiRoute(
-      { referencePoints: points, params: { routingMode: 'pedestrian' } },
-      {
-        routeStrokeColor: '#7ECBBD',
-        routeStrokeWidth: 5,
-        routeActiveStrokeColor: '#7ECBBD',
-        routeActiveStrokeWidth: 5,
-        wayPointStartIconFillColor: '#7ECBBD',
-        wayPointFinishIconFillColor: '#E8845C',
-        boundsAutoApply: true
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(texts[i])}`);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) {
+        throw new Error(`Адрес не найден: "${texts[i]}"`);
       }
-    );
+      coords[i] = { lat: data[0].lat, lng: data[0].lng };
+      waypointCoords[i] = coords[i];
+    }
 
-    // ВАЖНО: слушатели ДО добавления на карту — не пропустим событие
-    await new Promise((resolve, reject) => {
-      let done = false;
+    const wpts = coords.filter(Boolean);
 
-      function onOk()  { if (done) return; done = true; resolve(); }
-      function onErr(e){ if (done) return; done = true; reject(e || new Error('requesterror')); }
-
-      multiRoute.model.events.add('requestsuccess', onOk);
-      multiRoute.model.events.add('requesterror',   onErr);
-      // Запасной вариант — события на самом объекте
-      multiRoute.events.add('requestsuccess', onOk);
-      multiRoute.events.add('requesterror',   onErr);
-
-      setTimeout(() => {
-        if (done) return;
-        // Проверяем, вдруг уже готово (например, из кеша)
-        if (multiRoute.getActiveRoute()) { onOk(); return; }
-        onErr(new Error('timeout'));
-      }, 20000);
-
-      ymap.geoObjects.add(multiRoute);
+    // 2. Строим маршрут через OSRM (backend)
+    const routeRes = await fetch('/api/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waypoints: wpts })
     });
+    if (!routeRes.ok) throw new Error('Route service error ' + routeRes.status);
 
-    const active = multiRoute.getActiveRoute();
-    if (!active) throw new Error('no active route');
+    const { coords: rCoords, distText, durText, error: rErr } = await routeRes.json();
+    if (rErr) throw new Error(rErr);
 
-    const dist = active.properties.get('distance');
-    const dur  = active.properties.get('duration');
-    document.getElementById('r-dist').textContent = dist?.text || '—';
-    document.getElementById('r-time').textContent = dur?.text  || '—';
-
-    routeCoords = extractCoords(active);
+    routeCoords  = rCoords;
     routeTotalLen = calcLength(routeCoords);
-    console.log('Route coords extracted:', routeCoords.length, 'points');
+
+    // 3. Рисуем на карте вручную
+    drawRouteOnMap(routeCoords, wpts);
+
+    document.getElementById('r-dist').textContent = distText || '—';
+    document.getElementById('r-time').textContent = durText  || '—';
 
     hideLoading();
     showPanel('confirming');
-    generateGuide(points, dist?.text, dur?.text);
+    generateGuide(filled, distText, durText);
 
   } catch (e) {
     console.error('buildRoute error:', e);
     hideLoading();
-    showToast('Не удалось построить маршрут. Проверьте адреса или интернет.');
+    showToast(e.message.startsWith('Адрес') ? e.message : 'Не удалось построить маршрут. Проверьте адреса.');
   }
 }
 
-function extractCoords(activeRoute) {
-  const coords = [];
-  try {
-    activeRoute.getPaths().each(path => {
-      // Способ 1: геометрия самого пути
-      try {
-        const pts = path.geometry.getCoordinates();
-        if (Array.isArray(pts) && pts.length) { coords.push(...pts); return; }
-      } catch (_) {}
+function clearRouteFromMap() {
+  if (routeLine) { ymap.geoObjects.remove(routeLine); routeLine = null; }
+  routeMarkers.forEach(m => ymap.geoObjects.remove(m));
+  routeMarkers = [];
+}
 
-      // Способ 2: сегменты пути
-      try {
-        path.getSegments().each(seg => {
-          try {
-            const pts = seg.geometry.getCoordinates();
-            if (Array.isArray(pts)) coords.push(...pts);
-          } catch (_) {}
-        });
-      } catch (_) {}
+function drawRouteOnMap(coords, wpts) {
+  routeLine = new ymaps.GeoObject(
+    { geometry: { type: 'LineString', coordinates: coords } },
+    { geodesic: false, strokeWidth: 5, strokeColor: '#7ECBBD', strokeOpacity: 0.88 }
+  );
+  ymap.geoObjects.add(routeLine);
+
+  wpts.forEach((w, i) => {
+    const m = new ymaps.Placemark([w.lat, w.lng], {}, {
+      preset: 'islands#circleIcon',
+      iconColor: i === 0 ? '#7ECBBD' : '#E8845C'
     });
-  } catch (_) {}
-
-  // Убираем дубли
-  return coords.filter((c, i) => {
-    if (i === 0) return true;
-    return c[0] !== coords[i-1][0] || c[1] !== coords[i-1][1];
+    ymap.geoObjects.add(m);
+    routeMarkers.push(m);
   });
+
+  // Авто-зум на маршрут
+  try {
+    const lats = coords.map(c => c[0]);
+    const lngs = coords.map(c => c[1]);
+    ymap.setBounds(
+      [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
+      { checkZoomRange: true, duration: 600, margin: 50 }
+    );
+  } catch (_) {}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -697,8 +700,9 @@ function setGuideMsg(text, pulsing) {
 
 async function geocodeName(address) {
   try {
-    const r = await ymaps.geocode(address, { results: 1 });
-    return r.geoObjects.get(0)?.getAddressLine() || address;
+    const res  = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    return (Array.isArray(data) && data[0]?.text) ? data[0].text : address;
   } catch { return address; }
 }
 
@@ -839,7 +843,7 @@ function togglePause() {
 }
 
 function backToIdle() {
-  if (multiRoute) { ymap.geoObjects.remove(multiRoute); multiRoute = null; }
+  clearRouteFromMap();
   routeCoords = []; guideSegments = [];
   document.getElementById('btn-start').disabled = true;
   showPanel('idle');
@@ -885,16 +889,18 @@ async function useMyLocation() {
   showLoading('Определяю местоположение...');
   navigator.geolocation.getCurrentPosition(async pos => {
     hideLoading();
-    const coord = [pos.coords.latitude, pos.coords.longitude];
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
     try {
-      const res = await ymaps.geocode(coord, { results: 1 });
-      const name = res.geoObjects.get(0)?.getAddressLine() || `${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`;
-      waypointValues[0] = name;
-      renderWaypoints();
+      const res  = await fetch(`/api/geocode?q=${lat},${lng}`);
+      const data = await res.json();
+      const text = (Array.isArray(data) && data[0]?.text) ? data[0].text : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      waypointValues[0] = text;
+      waypointCoords[0] = { lat, lng };
     } catch {
-      waypointValues[0] = `${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`;
-      renderWaypoints();
+      waypointValues[0] = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      waypointCoords[0] = { lat, lng };
     }
+    renderWaypoints();
   }, () => { hideLoading(); showToast('Нет доступа к геолокации'); });
 }
 
