@@ -1,922 +1,836 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StoryTrek — Твой карманный экскурсовод</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU" type="text/javascript"></script>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>StoryTrek</title>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU" type="text/javascript"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0f0f1a;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px 16px;
-  }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
 
-  .app-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    width: 100%;
-  }
+    /* ── Map ───────────────────────────────────────── */
+    #map {
+      position: fixed; inset: 0; z-index: 0;
+    }
 
-  .screen-tabs {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .screen-tabs button {
-    font-size: 12px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    border: 1px solid rgba(126,203,189,0.3);
-    background: rgba(126,203,189,0.08);
-    color: rgba(255,255,255,0.7);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .screen-tabs button:hover,
-  .screen-tabs button.active-tab {
-    background: rgba(126,203,189,0.2);
-    color: #7ECBBD;
-    border-color: #7ECBBD;
-  }
+    /* ── Top bar ────────────────────────────────────── */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 56px;
+      padding: 0 20px;
+      padding-top: env(safe-area-inset-top);
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      font-size: 20px; font-weight: 700; color: #7ECBBD; letter-spacing: -0.3px;
+    }
+    .top-badge {
+      font-size: 12px; font-weight: 600; color: #7ECBBD;
+      background: rgba(126,203,189,0.12);
+      border: 1px solid rgba(126,203,189,0.25);
+      border-radius: 20px; padding: 4px 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .top-badge .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #7ECBBD;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  .phone {
-    width: 375px;
-    max-width: 100%;
-    background: #111827;
-    border-radius: 44px;
-    border: 6px solid #1f2937;
-    overflow: hidden;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05);
-    position: relative;
-  }
+    /* ── Panels ─────────────────────────────────────── */
+    .panel {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10, 14, 20, 0.97);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px 24px 0 0;
+      padding: 10px 20px 20px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+    .handle {
+      width: 40px; height: 4px;
+      background: rgba(255,255,255,0.12); border-radius: 2px;
+      margin: 0 auto 14px;
+    }
 
-  .notch {
-    position: absolute;
-    top: 0; left: 50%;
-    transform: translateX(-50%);
-    width: 120px; height: 28px;
-    background: #1f2937;
-    border-radius: 0 0 18px 18px;
-    z-index: 10;
-  }
+    /* ── Waypoint inputs ────────────────────────────── */
+    .waypoint-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px; position: relative;
+    }
+    .wp-line {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; flex-shrink: 0;
+    }
+    .wp-dot {
+      width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    }
+    .wp-dot.start { background: #7ECBBD; box-shadow: 0 0 0 3px rgba(126,203,189,0.18); }
+    .wp-dot.mid   { background: #E8845C; }
+    .wp-dot.end   { background: transparent; border: 2.5px solid #7ECBBD; }
+    .wp-connector { width: 2px; height: 8px; background: rgba(126,203,189,0.3); }
 
-  .screen { display: none; flex-direction: column; min-height: 680px; }
-  .screen.active { display: flex; }
+    .wp-input-wrap { flex: 1; position: relative; }
+    .wp-input {
+      width: 100%;
+      background: #161d28; border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px; padding: 11px 14px;
+      font-size: 14px; color: #fff; outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .wp-input:focus { border-color: rgba(126,203,189,0.5); }
+    .wp-input::placeholder { color: rgba(255,255,255,0.25); }
 
-  .status-bar {
-    background: #0d1117;
-    padding: 32px 20px 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .status-bar span { color: #fff; font-size: 12px; font-weight: 600; }
+    .wp-remove {
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: rgba(255,255,255,0.07); border: none;
+      border-radius: 50%; color: rgba(255,255,255,0.4);
+      cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .wp-remove:hover { background: rgba(255,255,255,0.12); }
 
-  .nav-header {
-    background: #0d1117;
-    padding: 10px 20px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .logo { font-size: 20px; font-weight: 700; color: #7ECBBD; letter-spacing: -0.5px; }
-  .logo-sub { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
-  .back-btn {
-    width: 34px; height: 34px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: #fff; flex-shrink: 0;
-    border: none;
-  }
-  .avatar-btn {
-    width: 34px; height: 34px;
-    background: rgba(126,203,189,0.15);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; margin-left: auto; border: none;
-    color: #7ECBBD;
-  }
+    /* Suggestions */
+    .sug-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #1a2233; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; overflow: hidden;
+      z-index: 300; display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .sug-item {
+      padding: 10px 14px; font-size: 13px; color: rgba(255,255,255,0.75);
+      cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.1s;
+    }
+    .sug-item:last-child { border-bottom: none; }
+    .sug-item:hover { background: rgba(126,203,189,0.1); color: #fff; }
 
-  .content { flex: 1; overflow-y: auto; background: #111827; }
-  .content::-webkit-scrollbar { width: 0; }
+    /* ── Action buttons ─────────────────────────────── */
+    .actions {
+      display: flex; gap: 8px; margin-top: 12px;
+    }
+    .btn-primary {
+      flex: 1; padding: 14px;
+      background: #7ECBBD; color: #052e28;
+      border: none; border-radius: 14px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn-ghost {
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px; color: rgba(255,255,255,0.65);
+      font-size: 15px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.11); }
 
-  .bottom-nav {
-    background: #0d1117;
-    padding: 10px 10px 20px;
-    display: flex;
-    justify-content: space-around;
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
-  .nav-item {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 3px; cursor: pointer; color: rgba(255,255,255,0.3);
-    font-size: 10px; padding: 4px 8px;
-    border-radius: 10px; transition: color 0.2s; border: none; background: none;
-  }
-  .nav-item.active { color: #7ECBBD; }
-  .nav-item i { font-size: 22px; }
+    /* ── Route info panel ───────────────────────────── */
+    .route-stats {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .stat-chip {
+      background: rgba(126,203,189,0.08);
+      border: 1px solid rgba(126,203,189,0.15);
+      border-radius: 10px; padding: 8px 14px;
+      font-size: 14px; font-weight: 600; color: #fff;
+      display: flex; align-items: center; gap: 6px;
+    }
 
-  /* MAP CONTAINERS */
-  .map-wrap {
-    position: relative;
-    overflow: hidden;
-  }
-  .map-wrap .ymap {
-    width: 100%;
-    height: 100%;
-  }
-  /* Disable Yandex Maps copyright/logo overlay clicks from breaking UI */
-  .map-wrap [class*="ymaps-2"] a { pointer-events: none; }
+    /* Guide status */
+    .guide-status {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; margin-bottom: 12px;
+      background: rgba(126,203,189,0.06);
+      border: 1px solid rgba(126,203,189,0.12);
+      border-radius: 12px;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #7ECBBD; flex-shrink: 0;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    .guide-status span { font-size: 13px; color: rgba(255,255,255,0.65); }
 
-  .map-overlay {
-    position: absolute; bottom: 12px; left: 12px; right: 12px;
-    background: rgba(0,0,0,0.65);
-    border-radius: 12px; padding: 8px 12px;
-    display: flex; align-items: center; gap: 8px;
-    backdrop-filter: blur(4px);
-    z-index: 10;
-    pointer-events: none;
-  }
-  .map-overlay .pulse {
-    width: 8px; height: 8px; border-radius: 50%; background: #7ECBBD; flex-shrink: 0;
-    animation: pulse 1.8s ease-in-out infinite;
-  }
-  .map-overlay span { color: #fff; font-size: 12px; }
-  @keyframes pulse {
-    0%,100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(126,203,189,0.4); }
-    50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 0 4px rgba(126,203,189,0); }
-  }
+    /* ── Navigation panel ───────────────────────────── */
+    .nav-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    }
+    .live-label {
+      flex: 1; font-size: 13px; font-weight: 600; color: #7ECBBD;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .nav-ctrl-row { display: flex; gap: 6px; }
+    .ctrl-btn {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.08); border: none;
+      border-radius: 10px; color: #fff; font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.13); }
 
-  .active-badge {
-    position: absolute; top: 12px; right: 12px;
-    background: rgba(232,132,92,0.9);
-    border-radius: 8px; padding: 4px 10px;
-    font-size: 11px; color: #fff; font-weight: 600;
-    z-index: 10; pointer-events: none;
-  }
+    /* Narration card */
+    .narr-card {
+      background: #161d28; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 12px 14px; margin-bottom: 12px;
+    }
+    .waveform {
+      height: 32px; display: flex; align-items: center; gap: 2px; margin-bottom: 8px;
+    }
+    .wave-bar {
+      flex: 1; background: rgba(126,203,189,0.45); border-radius: 1px;
+      animation: wave 1.4s ease-in-out infinite; transform-origin: center;
+    }
+    @keyframes wave { 0%,100%{transform:scaleY(0.18);opacity:0.35} 50%{transform:scaleY(1);opacity:1} }
+    .wave-bar.paused { animation-play-state: paused; }
+    .narr-text {
+      font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.6; font-style: italic;
+      max-height: 80px; overflow-y: auto;
+    }
 
-  /* SEARCH */
-  .search-box {
-    margin: 14px;
-    background: #1c2533;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
-    padding: 11px 14px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .search-box i { color: rgba(255,255,255,0.35); font-size: 18px; }
-  .search-box input {
-    flex: 1; border: none; background: transparent;
-    font-size: 14px; color: #fff; outline: none;
-  }
-  .search-box input::placeholder { color: rgba(255,255,255,0.3); }
+    /* Progress */
+    .prog-row { display: flex; align-items: center; gap: 10px; }
+    .prog-track {
+      flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;
+    }
+    .prog-fill { height: 100%; background: #7ECBBD; border-radius: 2px; transition: width 0.6s ease; }
+    .prog-label { font-size: 12px; color: rgba(255,255,255,0.35); white-space: nowrap; }
 
-  /* SECTION */
-  .section-title {
-    padding: 4px 14px 10px;
-    font-size: 11px; font-weight: 600;
-    color: rgba(255,255,255,0.4);
-    text-transform: uppercase; letter-spacing: 0.8px;
-  }
+    /* ── FAB (locate me) ────────────────────────────── */
+    .fab {
+      position: fixed; right: 16px; bottom: 240px; z-index: 50;
+      width: 44px; height: 44px;
+      background: rgba(10, 14, 20, 0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 50%; cursor: pointer; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .fab:hover { background: rgba(30, 40, 55, 0.95); }
+    .fab:active { transform: scale(0.95); }
 
-  /* TOUR CARDS */
-  .tour-cards { padding: 0 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .tour-card {
-    background: #1c2533;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 14px;
-    cursor: pointer;
-    transition: border-color 0.2s, transform 0.15s;
-    display: flex; gap: 12px; align-items: flex-start;
-  }
-  .tour-card:hover { border-color: rgba(126,203,189,0.3); transform: translateY(-1px); }
-  .tour-card:active { transform: scale(0.99); }
+    /* ── Loading overlay ────────────────────────────── */
+    .loading {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.55);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid rgba(126,203,189,0.2); border-top-color: #7ECBBD;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { color: rgba(255,255,255,0.65); font-size: 14px; }
 
-  .tour-thumb {
-    width: 54px; height: 54px;
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; flex-shrink: 0;
-  }
-  .tour-thumb.teal { background: rgba(126,203,189,0.12); }
-  .tour-thumb.coral { background: rgba(232,132,92,0.12); }
-  .tour-thumb.blue  { background: rgba(59,130,246,0.12); }
-
-  .tour-info { flex: 1; min-width: 0; }
-  .tour-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
-  .tour-meta { font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 7px; }
-  .tour-tags { display: flex; gap: 5px; flex-wrap: wrap; }
-  .tag { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
-  .tag.teal  { background: rgba(126,203,189,0.12); color: #7ECBBD; }
-  .tag.coral { background: rgba(232,132,92,0.12);  color: #E8845C; }
-  .tag.blue  { background: rgba(59,130,246,0.12);  color: #60a5fa; }
-  .tour-price { font-size: 13px; font-weight: 700; color: #7ECBBD; white-space: nowrap; }
-
-  /* ACTIVE ROUTE */
-  .active-banner {
-    margin: 14px;
-    background: linear-gradient(135deg, #0d2b25 0%, #0a1f1b 100%);
-    border: 1px solid rgba(126,203,189,0.2);
-    border-radius: 16px; padding: 16px;
-  }
-  .active-banner .label { font-size: 10px; color: rgba(126,203,189,0.6); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
-  .active-banner .title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 12px; }
-  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-  .progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #7ECBBD; border-radius: 2px; transition: width 0.3s; }
-  .progress-label { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; }
-  .controls { display: flex; gap: 8px; }
-  .ctrl-btn {
-    flex: 1; padding: 10px 6px;
-    border-radius: 10px; border: none;
-    font-size: 12px; font-weight: 600;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 5px;
-    transition: opacity 0.15s;
-  }
-  .ctrl-btn:active { opacity: 0.7; }
-  .ctrl-btn.primary { background: #7ECBBD; color: #052e28; }
-  .ctrl-btn.secondary { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.7); }
-
-  /* VOICE CARD */
-  .voice-card {
-    margin: 0 14px 14px;
-    background: #1c2533;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 14px;
-  }
-  .voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .voice-header .title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 6px; }
-  .voice-header .link { font-size: 11px; color: #7ECBBD; cursor: pointer; }
-  .waveform { height: 44px; display: flex; align-items: center; gap: 2px; margin-bottom: 10px; }
-  .wave-bar {
-    flex: 1; background: rgba(126,203,189,0.35); border-radius: 1px;
-    animation: wave 1.4s ease-in-out infinite;
-    transform-origin: center;
-  }
-  @keyframes wave {
-    0%,100% { transform: scaleY(0.25); opacity: 0.5; }
-    50% { transform: scaleY(1); opacity: 1; }
-  }
-  .voice-text { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; font-style: italic; }
-
-  /* POI LIST */
-  .poi-list { padding: 0 14px 16px; display: flex; flex-direction: column; gap: 6px; }
-  .poi-item {
-    background: #1c2533;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.05);
-    padding: 10px 12px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .poi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .poi-dot.passed  { background: #7ECBBD; }
-  .poi-dot.current { background: #E8845C; animation: pulse 1.5s infinite; }
-  .poi-dot.upcoming{ background: rgba(255,255,255,0.15); }
-  .poi-name { flex: 1; font-size: 13px; color: rgba(255,255,255,0.75); }
-  .poi-name.current { color: #fff; font-weight: 600; }
-  .poi-dist { font-size: 11px; color: rgba(255,255,255,0.35); }
-  .poi-dist.now { color: #E8845C; font-weight: 600; }
-
-  /* DETAIL */
-  .detail-hero {
-    height: 170px;
-    background: #0a0f1e;
-    position: relative; overflow: hidden;
-    padding: 48px 20px 18px;
-    display: flex; flex-direction: column; justify-content: flex-end;
-  }
-  .map-grid {
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(126,203,189,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(126,203,189,0.07) 1px, transparent 1px);
-    background-size: 28px 28px;
-  }
-  .detail-hero .detail-title { font-size: 22px; font-weight: 700; color: #fff; position: relative; z-index: 1; }
-  .detail-hero .detail-sub   { font-size: 12px; color: rgba(255,255,255,0.5); position: relative; z-index: 1; margin-top: 4px; }
-
-  .detail-stats {
-    margin: 14px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .stat-pill {
-    background: #1c2533;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 10px 8px; text-align: center;
-  }
-  .stat-pill .val { font-size: 17px; font-weight: 700; color: #fff; }
-  .stat-pill .lbl { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 2px; }
-
-  .tab-row {
-    display: flex;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    background: #111827;
-    padding: 0 14px;
-    margin-bottom: 14px;
-  }
-  .tab-item {
-    padding: 12px 14px 10px;
-    font-size: 13px; font-weight: 500;
-    color: rgba(255,255,255,0.35);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.2s;
-  }
-  .tab-item.active { color: #7ECBBD; border-bottom-color: #7ECBBD; }
-
-  .detail-desc { margin: 0 14px 14px; font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.65; }
-
-  .voice-select {
-    margin: 0 14px 14px;
-    background: #1c2533;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 12px;
-  }
-  .voice-select .label { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 10px; }
-  .voice-options { display: flex; gap: 6px; }
-  .voice-option {
-    flex: 1; padding: 10px 6px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.08);
-    text-align: center; cursor: pointer;
-    font-size: 11px; color: rgba(255,255,255,0.4);
-    transition: all 0.2s; background: transparent;
-  }
-  .voice-option.selected {
-    border-color: #7ECBBD;
-    background: rgba(126,203,189,0.1);
-    color: #7ECBBD;
-  }
-  .voice-option i { font-size: 20px; display: block; margin-bottom: 4px; }
-  .voice-option .vname { font-weight: 600; font-size: 11px; }
-
-  .start-btn {
-    margin: 0 14px 20px;
-    width: calc(100% - 28px);
-    padding: 15px;
-    background: #7ECBBD;
-    color: #052e28;
-    border: none; border-radius: 14px;
-    font-size: 15px; font-weight: 700;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: opacity 0.2s, transform 0.15s;
-  }
-  .start-btn:hover { opacity: 0.9; }
-  .start-btn:active { transform: scale(0.98); }
-
-  /* ONBOARDING */
-  .onboard {
-    flex: 1; background: #0d1117;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 40px 28px; text-align: center;
-  }
-  .icon-circle {
-    width: 90px; height: 90px;
-    background: rgba(126,203,189,0.1);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 24px;
-    border: 1px solid rgba(126,203,189,0.2);
-  }
-  .icon-circle i { font-size: 40px; color: #7ECBBD; }
-  .onboard h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 10px; line-height: 1.3; }
-  .onboard p  { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.65; margin-bottom: 32px; }
-  .dots { display: flex; gap: 6px; margin-bottom: 32px; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: all 0.3s; }
-  .dot.active { background: #7ECBBD; width: 20px; border-radius: 3px; }
-  .big-btn {
-    width: 100%; padding: 15px;
-    background: #7ECBBD; color: #052e28;
-    border: none; border-radius: 14px;
-    font-size: 15px; font-weight: 700;
-    cursor: pointer; margin-bottom: 12px;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: opacity 0.2s;
-  }
-  .big-btn:hover { opacity: 0.9; }
-  .skip-btn {
-    background: none; border: none;
-    color: rgba(255,255,255,0.3); font-size: 13px;
-    cursor: pointer; padding: 8px;
-  }
-
-  /* PROFILE */
-  .profile-header {
-    background: #0d1117;
-    padding: 28px 20px 24px;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .avatar {
-    width: 54px; height: 54px;
-    background: rgba(126,203,189,0.15);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700; color: #7ECBBD;
-    border: 1px solid rgba(126,203,189,0.2);
-  }
-  .profile-header .pname { font-size: 16px; font-weight: 600; color: #fff; }
-  .profile-header .pplan { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px; }
-  .pro-badge {
-    margin-left: auto;
-    background: rgba(126,203,189,0.12);
-    border-radius: 8px; padding: 5px 12px;
-    font-size: 12px; font-weight: 700; color: #7ECBBD;
-    border: 1px solid rgba(126,203,189,0.2);
-  }
-
-  .settings-list { padding: 14px; display: flex; flex-direction: column; gap: 4px; }
-  .settings-item {
-    background: #1c2533;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.05);
-    padding: 13px 14px;
-    display: flex; align-items: center; gap: 10px;
-    cursor: pointer; transition: border-color 0.15s;
-  }
-  .settings-item:hover { border-color: rgba(255,255,255,0.12); }
-  .settings-item .sicon { font-size: 18px; color: rgba(255,255,255,0.35); }
-  .settings-item .stext { flex: 1; font-size: 13px; color: rgba(255,255,255,0.75); }
-  .settings-item .sval  { font-size: 12px; color: rgba(255,255,255,0.3); }
-  .settings-item .schev { font-size: 16px; color: rgba(255,255,255,0.2); }
-  .settings-item.danger .stext { color: #f87171; }
-  .settings-item.danger .sicon { color: #f87171; }
-</style>
+    /* ── Toast ──────────────────────────────────────── */
+    .toast {
+      position: fixed; top: 68px; left: 16px; right: 16px; z-index: 300;
+      background: #3d1515; color: #fca5a5;
+      border: 1px solid rgba(252,165,165,0.2);
+      border-radius: 12px; padding: 12px 16px; font-size: 14px;
+      display: none; animation: slideDown 0.25s ease;
+    }
+    @keyframes slideDown { from{transform:translateY(-16px);opacity:0} to{transform:translateY(0);opacity:1} }
+  </style>
 </head>
 <body>
-<div class="app-wrapper">
 
-  <div class="screen-tabs">
-    <button onclick="showScreen('onboard')" id="tab-onboard" class="active-tab">👋 Онбординг</button>
-    <button onclick="showScreen('home')"    id="tab-home">🏠 Главная</button>
-    <button onclick="showScreen('active')"  id="tab-active">🗺️ Маршрут</button>
-    <button onclick="showScreen('detail')"  id="tab-detail">🎙️ Экскурсия</button>
-    <button onclick="showScreen('profile')" id="tab-profile">👤 Профиль</button>
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Top bar -->
+  <header class="top-bar">
+    <div class="logo">StoryTrek</div>
+    <div class="top-badge" id="top-badge" style="display:none">
+      <div class="dot"></div>
+      <span id="top-badge-text">В эфире</span>
+    </div>
+  </header>
+
+  <!-- Loading -->
+  <div class="loading" id="loading" style="display:none">
+    <div class="spinner"></div>
+    <p id="loading-text">Загрузка...</p>
   </div>
 
-  <div class="phone">
-    <div class="notch"></div>
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
 
-    <!-- ===== ONBOARDING ===== -->
-    <div id="screen-onboard" class="screen active" style="background:#0d1117;">
-      <div class="onboard">
-        <div class="icon-circle">
-          <i class="ti ti-map-2"></i>
-        </div>
-        <h2>Твой карманный экскурсовод</h2>
-        <p>Яндекс Карты + ИИ-голос Алисы рассказывает истории о местах прямо во время вашей прогулки</p>
-        <div class="dots">
-          <div class="dot active"></div>
-          <div class="dot"></div>
-          <div class="dot"></div>
-        </div>
-        <button class="big-btn" onclick="showScreen('home')">
-          Начать <i class="ti ti-arrow-right"></i>
-        </button>
-        <button class="skip-btn" onclick="showScreen('home')">Пропустить</button>
+  <!-- Panel: IDLE — ввод маршрута -->
+  <div class="panel" id="panel-idle">
+    <div class="handle"></div>
+    <div id="waypoints-list"></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="addWaypointField()">+ Точка</button>
+      <button class="btn-primary" onclick="buildRoute()">Маршрут →</button>
+    </div>
+  </div>
+
+  <!-- Panel: CONFIRMING — маршрут построен -->
+  <div class="panel" id="panel-confirming" style="display:none">
+    <div class="handle"></div>
+    <div class="route-stats">
+      <div class="stat-chip">📍 <span id="r-dist">—</span></div>
+      <div class="stat-chip">⏱ <span id="r-time">—</span></div>
+    </div>
+    <div class="guide-status">
+      <div class="pulse-dot" id="guide-dot"></div>
+      <span id="guide-msg">Генерирую аудиогид...</span>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToIdle()">← Изменить</button>
+      <button class="btn-primary" id="btn-start" onclick="startNav()" disabled>▶ Старт</button>
+    </div>
+  </div>
+
+  <!-- Panel: NAVIGATING — навигация -->
+  <div class="panel" id="panel-navigating" style="display:none">
+    <div class="nav-header">
+      <div class="live-label">
+        <div class="pulse-dot"></div>
+        В эфире
+      </div>
+      <div class="nav-ctrl-row">
+        <button class="ctrl-btn" id="btn-pause" onclick="togglePause()" title="Пауза">⏸</button>
+        <button class="ctrl-btn" onclick="stopNav()" title="Завершить">⏹</button>
       </div>
     </div>
-
-    <!-- ===== HOME ===== -->
-    <div id="screen-home" class="screen">
-      <div class="status-bar">
-        <span>9:41</span>
-        <span>StoryTrek</span>
-        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
-      </div>
-      <div class="nav-header">
-        <div>
-          <div class="logo">StoryTrek</div>
-          <div class="logo-sub">Твой карманный экскурсовод</div>
-        </div>
-        <button class="avatar-btn" onclick="showScreen('profile')" aria-label="Профиль">
-          <i class="ti ti-user" style="font-size:16px;"></i>
-        </button>
-      </div>
-      <div class="content">
-        <!-- Яндекс Карта -->
-        <div class="map-wrap" style="height:200px;">
-          <div id="map-home" class="ymap"></div>
-          <div class="map-overlay">
-            <div class="pulse"></div>
-            <span>Москва · Исторический центр</span>
-          </div>
-        </div>
-        <div class="search-box">
-          <i class="ti ti-search"></i>
-          <input type="text" placeholder="Найти маршрут, город, место...">
-        </div>
-        <div class="section-title">Популярные маршруты</div>
-        <div class="tour-cards">
-          <div class="tour-card" onclick="showScreen('detail')">
-            <div class="tour-thumb teal">🏛️</div>
-            <div class="tour-info">
-              <div class="tour-name">Арбат и окрестности</div>
-              <div class="tour-meta">Москва · 3.2 км · ~1.5 ч</div>
-              <div class="tour-tags">
-                <span class="tag teal">История</span>
-                <span class="tag coral">Архитектура</span>
-              </div>
-            </div>
-            <div class="tour-price">₽149</div>
-          </div>
-          <div class="tour-card" onclick="showScreen('detail')">
-            <div class="tour-thumb coral">⛩️</div>
-            <div class="tour-info">
-              <div class="tour-name">Красная площадь</div>
-              <div class="tour-meta">Москва · 1.8 км · ~50 мин</div>
-              <div class="tour-tags">
-                <span class="tag coral">Иконическое</span>
-                <span class="tag blue">Бесплатно</span>
-              </div>
-            </div>
-            <div class="tour-price">Бесп.</div>
-          </div>
-          <div class="tour-card" onclick="showScreen('detail')">
-            <div class="tour-thumb blue">🌉</div>
-            <div class="tour-info">
-              <div class="tour-name">Набережная Невы</div>
-              <div class="tour-meta">СПб · 4.5 км · ~2 ч</div>
-              <div class="tour-tags">
-                <span class="tag blue">Природа</span>
-                <span class="tag teal">Вечер</span>
-              </div>
-            </div>
-            <div class="tour-price">₽199</div>
-          </div>
-          <div style="height:16px;"></div>
-        </div>
-      </div>
-      <div class="bottom-nav">
-        <button class="nav-item active" onclick="showScreen('home')">
-          <i class="ti ti-home"></i><span>Главная</span>
-        </button>
-        <button class="nav-item" onclick="showScreen('active')">
-          <i class="ti ti-route"></i><span>Маршруты</span>
-        </button>
-        <button class="nav-item">
-          <i class="ti ti-heart"></i><span>Избранное</span>
-        </button>
-        <button class="nav-item" onclick="showScreen('profile')">
-          <i class="ti ti-user"></i><span>Профиль</span>
-        </button>
-      </div>
+    <div class="narr-card">
+      <div class="waveform" id="wf"></div>
+      <p class="narr-text" id="narr-text">Готовлюсь к рассказу...</p>
     </div>
-
-    <!-- ===== ACTIVE ROUTE ===== -->
-    <div id="screen-active" class="screen">
-      <div class="status-bar" style="background:#0d1117;">
-        <span>10:12</span>
-        <span style="color:#7ECBBD;">● В эфире</span>
-        <span><i class="ti ti-wifi" style="font-size:14px;color:#fff;"></i></span>
-      </div>
-      <div class="nav-header">
-        <button class="back-btn" onclick="showScreen('home')" aria-label="Назад">
-          <i class="ti ti-arrow-left" style="font-size:16px;"></i>
-        </button>
-        <div>
-          <div class="logo" style="font-size:15px;">Арбат и окрестности</div>
-          <div class="logo-sub">Яндекс Навигатор активен</div>
-        </div>
-      </div>
-      <div class="content">
-        <!-- Яндекс Карта с маршрутом -->
-        <div class="map-wrap" style="height:180px;">
-          <div id="map-active" class="ymap"></div>
-          <div class="active-badge">● Вы здесь</div>
-        </div>
-        <div class="active-banner">
-          <div class="label">Активный маршрут</div>
-          <div class="title">Арбат и окрестности</div>
-          <div class="progress-row">
-            <div class="progress-track"><div class="progress-fill" style="width:42%;"></div></div>
-            <div class="progress-label">42% · 1.8 км осталось</div>
-          </div>
-          <div class="controls">
-            <button class="ctrl-btn primary"><i class="ti ti-player-pause"></i> Пауза</button>
-            <button class="ctrl-btn secondary"><i class="ti ti-map"></i> Карта</button>
-            <button class="ctrl-btn secondary" onclick="showScreen('home')"><i class="ti ti-x"></i> Стоп</button>
-          </div>
-        </div>
-        <div class="voice-card">
-          <div class="voice-header">
-            <div class="title"><i class="ti ti-speakerphone" style="font-size:16px;color:#7ECBBD;"></i> Алиса рассказывает</div>
-            <div class="link">Сменить голос</div>
-          </div>
-          <div class="waveform" id="waveform"></div>
-          <div class="voice-text">"Справа от вас — дом № 9 по Арбату. Именно здесь в 1832 году останавливался Александр Пушкин перед своей свадьбой с Натальей Гончаровой..."</div>
-        </div>
-        <div class="section-title">Точки маршрута</div>
-        <div class="poi-list">
-          <div class="poi-item">
-            <div class="poi-dot passed"></div>
-            <div class="poi-name">Начало: Смоленская</div>
-            <div class="poi-dist"><i class="ti ti-check" style="color:#7ECBBD;font-size:14px;"></i></div>
-          </div>
-          <div class="poi-item">
-            <div class="poi-dot passed"></div>
-            <div class="poi-name">Театр им. Вахтангова</div>
-            <div class="poi-dist"><i class="ti ti-check" style="color:#7ECBBD;font-size:14px;"></i></div>
-          </div>
-          <div class="poi-item">
-            <div class="poi-dot current"></div>
-            <div class="poi-name current">Дом Пушкина на Арбате</div>
-            <div class="poi-dist now">сейчас</div>
-          </div>
-          <div class="poi-item">
-            <div class="poi-dot upcoming"></div>
-            <div class="poi-name">Арбатская площадь</div>
-            <div class="poi-dist">0.6 км</div>
-          </div>
-          <div class="poi-item">
-            <div class="poi-dot upcoming"></div>
-            <div class="poi-name">Финиш: Арбатские ворота</div>
-            <div class="poi-dist">1.8 км</div>
-          </div>
-          <div style="height:10px;"></div>
-        </div>
-      </div>
+    <div class="prog-row">
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      <span class="prog-label" id="prog-label">—</span>
     </div>
+  </div>
 
-    <!-- ===== DETAIL ===== -->
-    <div id="screen-detail" class="screen">
-      <div class="status-bar">
-        <span>9:41</span><span>StoryTrek</span>
-        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
-      </div>
-      <div class="detail-hero">
-        <div class="map-grid"></div>
-        <button onclick="showScreen('home')" style="position:absolute;top:40px;left:14px;z-index:2;width:34px;height:34px;background:rgba(0,0,0,0.45);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" aria-label="Назад">
-          <i class="ti ti-arrow-left" style="color:#fff;font-size:16px;"></i>
-        </button>
-        <div class="detail-title">Арбат и окрестности</div>
-        <div class="detail-sub">Москва · ИИ-гид Алиса (Яндекс SpeechKit)</div>
-      </div>
-      <div class="content">
-        <div class="detail-stats">
-          <div class="stat-pill"><div class="val">3.2</div><div class="lbl">км</div></div>
-          <div class="stat-pill"><div class="val">1.5 ч</div><div class="lbl">время</div></div>
-          <div class="stat-pill"><div class="val">₽149</div><div class="lbl">стоимость</div></div>
-        </div>
-        <div class="tab-row">
-          <div class="tab-item active">Описание</div>
-          <div class="tab-item">Точки</div>
-          <div class="tab-item">Отзывы</div>
-        </div>
-        <div class="detail-desc">
-          Прогулка по легендарному Арбату — самой известной пешеходной улице Москвы. ИИ-гид расскажет об архитектуре, исторических событиях и знаменитых жителях прямо во время вашего движения через Яндекс Навигатор.
-        </div>
-        <div style="display:flex;gap:6px;margin: 8px 14px 14px;flex-wrap:wrap;">
-          <span class="tag teal">История</span>
-          <span class="tag coral">Архитектура</span>
-          <span class="tag blue">Пешком</span>
-          <span class="tag teal">Семья</span>
-        </div>
-        <div class="voice-select">
-          <div class="label">Голос гида (Яндекс SpeechKit)</div>
-          <div class="voice-options">
-            <button class="voice-option selected" onclick="selectVoice(this)">
-              <i class="ti ti-microphone"></i>
-              <div class="vname">Алиса</div>
-            </button>
-            <button class="voice-option" onclick="selectVoice(this)">
-              <i class="ti ti-microphone"></i>
-              <div class="vname">Филипп</div>
-            </button>
-            <button class="voice-option" onclick="selectVoice(this)">
-              <i class="ti ti-microphone"></i>
-              <div class="vname">Захар</div>
-            </button>
-          </div>
-        </div>
-        <button class="start-btn" onclick="showScreen('active')">
-          <i class="ti ti-player-play"></i> Запустить маршрут
-        </button>
-      </div>
-    </div>
-
-    <!-- ===== PROFILE ===== -->
-    <div id="screen-profile" class="screen">
-      <div class="status-bar">
-        <span>9:41</span><span>StoryTrek</span>
-        <span><i class="ti ti-wifi" style="font-size:14px;"></i></span>
-      </div>
-      <div class="profile-header">
-        <div class="avatar">АБ</div>
-        <div>
-          <div class="pname">Андрей Борисов</div>
-          <div class="pplan">Подписка Pro · до 12.2025</div>
-        </div>
-        <div class="pro-badge">Pro</div>
-      </div>
-      <div class="content">
-        <div class="detail-stats">
-          <div class="stat-pill"><div class="val">12</div><div class="lbl">маршрутов</div></div>
-          <div class="stat-pill"><div class="val">34 км</div><div class="lbl">пройдено</div></div>
-          <div class="stat-pill"><div class="val">8.2 ч</div><div class="lbl">аудио</div></div>
-        </div>
-        <div class="settings-list">
-          <div class="settings-item">
-            <i class="ti ti-history sicon"></i>
-            <div class="stext">История маршрутов</div>
-            <i class="ti ti-chevron-right schev"></i>
-          </div>
-          <div class="settings-item">
-            <i class="ti ti-credit-card sicon"></i>
-            <div class="stext">Подписка и оплата</div>
-            <i class="ti ti-chevron-right schev"></i>
-          </div>
-          <div class="settings-item">
-            <i class="ti ti-microphone sicon"></i>
-            <div class="stext">Голос гида по умолчанию</div>
-            <div class="sval">Алиса</div>
-            <i class="ti ti-chevron-right schev"></i>
-          </div>
-          <div class="settings-item">
-            <i class="ti ti-language sicon"></i>
-            <div class="stext">Язык интерфейса</div>
-            <div class="sval">Русский</div>
-            <i class="ti ti-chevron-right schev"></i>
-          </div>
-          <div class="settings-item">
-            <i class="ti ti-map sicon"></i>
-            <div class="stext">Настройки Яндекс Карт</div>
-            <i class="ti ti-chevron-right schev"></i>
-          </div>
-          <div class="settings-item danger">
-            <i class="ti ti-logout sicon"></i>
-            <div class="stext">Выйти</div>
-          </div>
-          <div style="height:10px;"></div>
-        </div>
-      </div>
-      <div class="bottom-nav">
-        <button class="nav-item" onclick="showScreen('home')">
-          <i class="ti ti-home"></i><span>Главная</span>
-        </button>
-        <button class="nav-item" onclick="showScreen('active')">
-          <i class="ti ti-route"></i><span>Маршруты</span>
-        </button>
-        <button class="nav-item">
-          <i class="ti ti-heart"></i><span>Избранное</span>
-        </button>
-        <button class="nav-item active">
-          <i class="ti ti-user"></i><span>Профиль</span>
-        </button>
-      </div>
-    </div>
-
-  </div><!-- /phone -->
-</div><!-- /app-wrapper -->
+  <!-- FAB locate me -->
+  <button class="fab" onclick="locateMe()" title="Моё местоположение">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke-width="1.5" opacity="0.4"/>
+    </svg>
+  </button>
 
 <script>
-// ── Навигация по экранам ──────────────────────────────────────────────────
-function showScreen(name) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-' + name).classList.add('active');
-  document.querySelectorAll('.screen-tabs button').forEach(b => b.classList.remove('active-tab'));
-  const t = document.getElementById('tab-' + name);
-  if (t) t.classList.add('active-tab');
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const TRIGGER_DIST_M = 80;       // метров до точки, чтобы запустить фрагмент
+const DEFAULT_CENTER  = [55.752, 37.622]; // Москва
+const DEFAULT_ZOOM    = 12;
 
-  // Инициализируем карту при первом показе экрана, потом подстраиваем размер
-  setTimeout(() => {
-    if (name === 'home') {
-      if (!maps.home) initHomeMap();
-      else maps.home.container.fitToViewport();
-    }
-    if (name === 'active') {
-      if (!maps.active) initActiveMap();
-      else maps.active.container.fitToViewport();
-    }
-  }, 60);
-}
+// ═══════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════
+let ymap        = null;
+let multiRoute  = null;
+let userMarker  = null;
+let watchId     = null;
 
-function selectVoice(el) {
-  el.closest('.voice-options').querySelectorAll('.voice-option').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-}
+let waypointValues = ['', ''];  // минимум 2 поля
+let routeCoords    = [];        // [[lat,lon], ...] — координаты маршрута
+let guideSegments  = [];        // [{text, triggerCoord, audioBlob}]
+let segIdx         = 0;
+let curAudio       = null;
+let isAudioBusy    = false;
+let isPaused       = false;
+let routeTotalLen  = 0;
 
-// ── Waveform ──────────────────────────────────────────────────────────────
-const wf = document.getElementById('waveform');
-if (wf) {
-  for (let i = 0; i < 30; i++) {
-    const bar = document.createElement('div');
-    bar.className = 'wave-bar';
-    const h = Math.floor(Math.random() * 65) + 20;
-    bar.style.height = h + '%';
-    bar.style.animationDelay = (i * 0.055).toFixed(3) + 's';
-    wf.appendChild(bar);
-  }
-}
-
-// ── Яндекс Карты ─────────────────────────────────────────────────────────
-const maps = {};
-
-// Координаты маршрута по Арбату [lat, lon]
-const ARBAT_ROUTE = [
-  [55.7491, 37.5834], // Смоленская
-  [55.7500, 37.5868], // Начало Арбата
-  [55.7506, 37.5904], // Театр Вахтангова
-  [55.7512, 37.5947], // Дом Пушкина
-  [55.7518, 37.5978], // Арбатская площадь
-  [55.7523, 37.6030]  // Арбатские ворота
-];
-
-function makeMarkerIcon(color) {
-  return ymaps.templateLayoutFactory.createClass(
-    '<div style="width:14px;height:14px;background:' + color + ';border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);transform:translate(-7px,-7px);"></div>'
-  );
-}
-
-function initHomeMap() {
-  maps.home = new ymaps.Map('map-home', {
-    center: [55.752, 37.604],
-    zoom: 12,
-    controls: []
+// ═══════════════════════════════════════════════════════
+// MAP INIT
+// ═══════════════════════════════════════════════════════
+ymaps.ready(() => {
+  ymap = new ymaps.Map('map', {
+    center: DEFAULT_CENTER,
+    zoom: DEFAULT_ZOOM,
+    controls: ['zoomControl']
   }, { suppressMapOpenBlock: true });
 
-  // Маркеры маршрутов
-  const tours = [
-    { coords: [55.7508, 37.5925], color: '#7ECBBD', hint: 'Арбат и окрестности' },
-    { coords: [55.7539, 37.6208], color: '#E8845C', hint: 'Красная площадь' },
-  ];
-  tours.forEach(t => {
-    maps.home.geoObjects.add(new ymaps.Placemark(t.coords, { hintContent: t.hint }, {
-      iconLayout: makeMarkerIcon(t.color),
-      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
-    }));
+  // Центрируем на пользователе при старте
+  navigator.geolocation?.getCurrentPosition(pos => {
+    ymap.setCenter([pos.coords.latitude, pos.coords.longitude], 14, { duration: 500 });
+  }, () => {});
+
+  renderWaypoints();
+});
+
+// ═══════════════════════════════════════════════════════
+// PANELS
+// ═══════════════════════════════════════════════════════
+function showPanel(name) {
+  ['idle', 'confirming', 'navigating'].forEach(n => {
+    document.getElementById('panel-' + n).style.display = n === name ? 'block' : 'none';
+  });
+  const badge = document.getElementById('top-badge');
+  badge.style.display = name === 'navigating' ? 'flex' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+// WAYPOINTS UI
+// ═══════════════════════════════════════════════════════
+function addWaypointField() {
+  waypointValues.splice(waypointValues.length - 1, 0, '');
+  renderWaypoints();
+}
+
+function removeWaypointField(idx) {
+  if (waypointValues.length <= 2) return;
+  waypointValues.splice(idx, 1);
+  renderWaypoints();
+}
+
+function renderWaypoints() {
+  const container = document.getElementById('waypoints-list');
+  container.innerHTML = '';
+
+  waypointValues.forEach((val, i) => {
+    const isStart = i === 0;
+    const isEnd   = i === waypointValues.length - 1;
+    const dotCls  = isStart ? 'start' : isEnd ? 'end' : 'mid';
+    const ph      = isStart ? 'Откуда...' : isEnd ? 'Куда...' : 'Промежуточная точка...';
+
+    const row = document.createElement('div');
+    row.className = 'waypoint-row';
+    row.innerHTML = `
+      <div class="wp-line">
+        <div class="wp-dot ${dotCls}"></div>
+        ${!isEnd ? '<div class="wp-connector"></div>' : ''}
+      </div>
+      <div class="wp-input-wrap">
+        <input class="wp-input" data-idx="${i}" type="text"
+               placeholder="${ph}" value="${escHtml(val)}" autocomplete="off">
+        <div class="sug-list" id="sug-${i}"></div>
+      </div>
+      ${waypointValues.length > 2
+        ? `<button class="wp-remove" onclick="removeWaypointField(${i})" aria-label="Удалить">×</button>`
+        : ''}
+    `;
+    container.appendChild(row);
+
+    const input = row.querySelector('.wp-input');
+    input.addEventListener('input', () => {
+      waypointValues[i] = input.value;
+      debounceSuggest(i, input.value);
+    });
+    input.addEventListener('blur', () => setTimeout(() => hideSug(i), 200));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') hideSug(i); });
   });
 }
 
-function initActiveMap() {
-  maps.active = new ymaps.Map('map-active', {
-    center: [55.7508, 37.5930],
-    zoom: 15,
-    controls: []
-  }, { suppressMapOpenBlock: true });
-
-  // Пройденный отрезок маршрута (серый)
-  maps.active.geoObjects.add(new ymaps.Polyline(
-    ARBAT_ROUTE.slice(0, 3),
-    {},
-    { strokeColor: '#4a5568', strokeWidth: 4, strokeOpacity: 0.8 }
-  ));
-
-  // Оставшийся маршрут (зелёный)
-  maps.active.geoObjects.add(new ymaps.Polyline(
-    ARBAT_ROUTE.slice(2),
-    {},
-    { strokeColor: '#7ECBBD', strokeWidth: 4, strokeOpacity: 0.9 }
-  ));
-
-  // Метка текущего положения
-  maps.active.geoObjects.add(new ymaps.Placemark(
-    [55.7512, 37.5947],
-    { hintContent: 'Дом Пушкина на Арбате' },
-    {
-      iconLayout: makeMarkerIcon('#E8845C'),
-      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
-    }
-  ));
-
-  // Метка финиша
-  maps.active.geoObjects.add(new ymaps.Placemark(
-    ARBAT_ROUTE[ARBAT_ROUTE.length - 1],
-    { hintContent: 'Финиш: Арбатские ворота' },
-    {
-      iconLayout: makeMarkerIcon('#7ECBBD'),
-      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
-    }
-  ));
+const sugTimers = {};
+function debounceSuggest(idx, val) {
+  clearTimeout(sugTimers[idx]);
+  if (val.length < 2) { hideSug(idx); return; }
+  sugTimers[idx] = setTimeout(() => fetchSug(idx, val), 280);
 }
 
-ymaps.ready(function() {
-  // Если пользователь уже на экране home — инициализируем сразу
-  if (document.getElementById('screen-home').classList.contains('active')) {
-    initHomeMap();
+async function fetchSug(idx, val) {
+  try {
+    const results = await ymaps.suggest(val, { results: 5 });
+    const list = document.getElementById('sug-' + idx);
+    if (!list) return;
+    if (!results.length) { hideSug(idx); return; }
+
+    list.innerHTML = results
+      .map(r => `<div class="sug-item" data-val="${escAttr(r.value)}">${escHtml(r.displayName)}</div>`)
+      .join('');
+    list.style.display = 'block';
+
+    list.querySelectorAll('.sug-item').forEach(item => {
+      item.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const v = item.dataset.val;
+        waypointValues[idx] = v;
+        document.querySelector(`.wp-input[data-idx="${idx}"]`).value = v;
+        hideSug(idx);
+      });
+    });
+  } catch (_) {}
+}
+
+function hideSug(idx) {
+  const el = document.getElementById('sug-' + idx);
+  if (el) { el.innerHTML = ''; el.style.display = 'none'; }
+}
+
+// ═══════════════════════════════════════════════════════
+// ROUTE BUILDING
+// ═══════════════════════════════════════════════════════
+async function buildRoute() {
+  const points = waypointValues.map(v => v.trim()).filter(Boolean);
+  if (points.length < 2) { showToast('Укажите минимум две точки маршрута'); return; }
+
+  showLoading('Строим маршрут...');
+
+  try {
+    if (multiRoute) { ymap.geoObjects.remove(multiRoute); multiRoute = null; }
+
+    multiRoute = new ymaps.multiRouter.MultiRoute(
+      { referencePoints: points, params: { routingMode: 'pedestrian' } },
+      {
+        routeStrokeColor: '#7ECBBD',
+        routeStrokeWidth: 5,
+        routeActiveStrokeColor: '#7ECBBD',
+        routeActiveStrokeWidth: 5,
+        wayPointStartIconFillColor: '#7ECBBD',
+        wayPointFinishIconFillColor: '#E8845C',
+        boundsAutoApply: true
+      }
+    );
+    ymap.geoObjects.add(multiRoute);
+
+    await new Promise((res, rej) => {
+      multiRoute.model.events.add('requestsuccess', res);
+      multiRoute.model.events.add('requesterror', rej);
+      setTimeout(() => rej(new Error('timeout')), 18000);
+    });
+
+    const active = multiRoute.getActiveRoute();
+    if (!active) throw new Error('No route');
+
+    const dist = active.properties.get('distance');
+    const dur  = active.properties.get('duration');
+    document.getElementById('r-dist').textContent = dist?.text || '—';
+    document.getElementById('r-time').textContent = dur?.text  || '—';
+
+    routeCoords = extractCoords(active);
+    routeTotalLen = calcLength(routeCoords);
+
+    hideLoading();
+    showPanel('confirming');
+
+    // Генерируем гид в фоне
+    generateGuide(points, dist?.text, dur?.text);
+
+  } catch (e) {
+    hideLoading();
+    showToast('Не удалось построить маршрут. Проверьте адреса.');
   }
-});
+}
+
+function extractCoords(activeRoute) {
+  const coords = [];
+  try {
+    activeRoute.getPaths().each(path => {
+      path.getSegments().each(seg => {
+        const geo = seg.geometry;
+        if (geo?.getCoordinates) {
+          const pts = geo.getCoordinates();
+          if (Array.isArray(pts) && pts.length) coords.push(...pts);
+        }
+      });
+    });
+  } catch (_) {}
+  return coords;
+}
+
+// ═══════════════════════════════════════════════════════
+// GUIDE GENERATION
+// ═══════════════════════════════════════════════════════
+async function generateGuide(points, distText, durText) {
+  setGuideMsg('Генерирую аудиогид...', true);
+  document.getElementById('btn-start').disabled = true;
+
+  try {
+    // Геокодируем точки для описания
+    const names = await Promise.all(points.map(geocodeName));
+
+    const desc = [
+      `Маршрут: от «${names[0]}» до «${names[names.length - 1]}»`,
+      names.length > 2 ? `Промежуточные точки: ${names.slice(1, -1).join(', ')}` : null,
+      `Расстояние: ${distText || '—'}, время пешком: ${durText || '—'}`,
+      `Полный маршрут: ${names.join(' → ')}`
+    ].filter(Boolean).join('\n');
+
+    const res = await fetch('/api/generate-guide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ routeDescription: desc })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const { text, error } = await res.json();
+    if (error) throw new Error(error);
+    if (!text) throw new Error('empty');
+
+    // Разбиваем на абзацы и привязываем к точкам маршрута
+    const paras = text.split(/\n\n+/).map(s => s.trim()).filter(s => s.length > 15);
+    guideSegments = paras.map((t, i) => {
+      const ratio = paras.length > 1 ? i / (paras.length - 1) : 0;
+      const ci = Math.min(
+        Math.floor(ratio * (routeCoords.length - 1)),
+        routeCoords.length - 1
+      );
+      return { text: t, triggerCoord: routeCoords[ci] || null, audioBlob: null };
+    });
+
+    // Синтезируем первый фрагмент
+    await synthesizeSeg(0);
+
+    setGuideMsg(`🎙 Аудиогид готов · ${guideSegments.length} фрагментов`, false);
+    document.getElementById('btn-start').disabled = false;
+
+  } catch (e) {
+    setGuideMsg('Ошибка генерации. Попробуйте снова.', false);
+    console.error('Guide error:', e);
+  }
+}
+
+function setGuideMsg(text, pulsing) {
+  document.getElementById('guide-msg').textContent = text;
+  document.getElementById('guide-dot').style.animationPlayState = pulsing ? 'running' : 'paused';
+}
+
+async function geocodeName(address) {
+  try {
+    const r = await ymaps.geocode(address, { results: 1 });
+    return r.geoObjects.get(0)?.getAddressLine() || address;
+  } catch { return address; }
+}
+
+// ═══════════════════════════════════════════════════════
+// TTS (Yandex SpeechKit via Netlify Function)
+// ═══════════════════════════════════════════════════════
+async function synthesizeSeg(idx) {
+  if (idx >= guideSegments.length) return;
+  if (guideSegments[idx].audioBlob) return; // уже готово
+
+  try {
+    const res = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: guideSegments[idx].text, voice: 'alena' })
+    });
+    if (!res.ok) throw new Error('TTS HTTP ' + res.status);
+    guideSegments[idx].audioBlob = await res.blob();
+  } catch (e) {
+    console.warn('TTS failed, will use browser TTS:', e);
+    guideSegments[idx].useBrowserTTS = true;
+  }
+}
+
+function playSegment(idx) {
+  if (idx >= guideSegments.length || isAudioBusy || isPaused) return;
+
+  const seg = guideSegments[idx];
+  if (!seg.audioBlob && !seg.useBrowserTTS) return; // ещё синтезируется
+
+  // Обновляем текст в UI
+  document.getElementById('narr-text').textContent = seg.text;
+  setWavePlaying(true);
+
+  if (curAudio) { curAudio.pause(); URL.revokeObjectURL(curAudio._url || ''); curAudio = null; }
+
+  const onEnded = () => {
+    isAudioBusy = false;
+    segIdx = idx + 1;
+    setWavePlaying(false);
+    // Предзагружаем следующий фрагмент
+    if (segIdx < guideSegments.length) synthesizeSeg(segIdx);
+    if (segIdx >= guideSegments.length) {
+      document.getElementById('narr-text').textContent = 'Маршрут завершён! Надеюсь, прогулка понравилась.';
+    }
+  };
+
+  isAudioBusy = true;
+
+  if (seg.useBrowserTTS) {
+    // Fallback: браузерный TTS
+    const utter = new SpeechSynthesisUtterance(seg.text);
+    utter.lang = 'ru-RU'; utter.rate = 0.95;
+    utter.onend = onEnded;
+    speechSynthesis.speak(utter);
+    return;
+  }
+
+  const url = URL.createObjectURL(seg.audioBlob);
+  curAudio = new Audio(url);
+  curAudio._url = url;
+  curAudio.addEventListener('ended', onEnded);
+  curAudio.play().catch(() => { isAudioBusy = false; setWavePlaying(false); });
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+async function startNav() {
+  if (!guideSegments.length) { showToast('Аудиогид ещё не готов'); return; }
+
+  segIdx = 0; isPaused = false; isAudioBusy = false;
+
+  // Маркер пользователя
+  userMarker = new ymaps.Placemark(DEFAULT_CENTER, {}, {
+    iconLayout: ymaps.templateLayoutFactory.createClass(
+      '<div style="width:18px;height:18px;background:#7ECBBD;border-radius:50%;border:3px solid #fff;' +
+      'box-shadow:0 0 0 5px rgba(126,203,189,0.25);transform:translate(-9px,-9px);"></div>'
+    ),
+    iconShape: { type: 'Circle', coordinates: [0, 0], radius: 11 }
+  });
+  ymap.geoObjects.add(userMarker);
+
+  // Вейвформ
+  buildWaveform();
+
+  showPanel('navigating');
+
+  // Запускаем первый фрагмент сразу
+  playSegment(0);
+
+  // Геолокация
+  if (navigator.geolocation) {
+    watchId = navigator.geolocation.watchPosition(
+      onPosition,
+      err => console.warn('Geo error', err.code, err.message),
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 }
+    );
+  }
+}
+
+function onPosition(pos) {
+  const coord = [pos.coords.latitude, pos.coords.longitude];
+
+  if (userMarker) userMarker.geometry.setCoordinates(coord);
+  ymap.panTo(coord, { flying: false, duration: 600 });
+
+  // Прогресс
+  if (routeCoords.length > 1 && routeTotalLen > 0) {
+    const distToEnd = haversine(coord, routeCoords[routeCoords.length - 1]);
+    const pct = Math.min(100, Math.max(0, (1 - distToEnd / routeTotalLen) * 100));
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = fmtDist(distToEnd);
+  }
+
+  // Проверяем триггеры фрагментов
+  if (!isAudioBusy && !isPaused) {
+    for (let i = segIdx; i < guideSegments.length; i++) {
+      const seg = guideSegments[i];
+      if (!seg.triggerCoord) { segIdx = i; playSegment(i); break; }
+      const d = haversine(coord, seg.triggerCoord);
+      if (d < TRIGGER_DIST_M) { segIdx = i; playSegment(i); break; }
+    }
+  }
+}
+
+function stopNav() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (curAudio) { curAudio.pause(); curAudio = null; }
+  speechSynthesis.cancel();
+  isAudioBusy = false; isPaused = false;
+  if (userMarker) { ymap.geoObjects.remove(userMarker); userMarker = null; }
+  guideSegments = []; segIdx = 0;
+  backToIdle();
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+  const btn = document.getElementById('btn-pause');
+  if (isPaused) {
+    curAudio?.pause();
+    speechSynthesis.pause();
+    setWavePlaying(false);
+    btn.textContent = '▶';
+    btn.title = 'Продолжить';
+  } else {
+    curAudio?.play();
+    speechSynthesis.resume();
+    setWavePlaying(true);
+    btn.textContent = '⏸';
+    btn.title = 'Пауза';
+  }
+}
+
+function backToIdle() {
+  if (multiRoute) { ymap.geoObjects.remove(multiRoute); multiRoute = null; }
+  routeCoords = []; guideSegments = [];
+  document.getElementById('btn-start').disabled = true;
+  showPanel('idle');
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+function haversine(a, b) {
+  const R = 6371000;
+  const φ1 = a[0] * Math.PI / 180, φ2 = b[0] * Math.PI / 180;
+  const dφ = (b[0] - a[0]) * Math.PI / 180;
+  const dλ = (b[1] - a[1]) * Math.PI / 180;
+  const x = Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function calcLength(coords) {
+  let len = 0;
+  for (let i = 1; i < coords.length; i++) len += haversine(coords[i-1], coords[i]);
+  return len || 1;
+}
+
+function fmtDist(m) {
+  return m >= 1000 ? (m / 1000).toFixed(1) + ' км' : Math.round(m) + ' м';
+}
+
+function locateMe() {
+  navigator.geolocation?.getCurrentPosition(
+    pos => ymap.panTo([pos.coords.latitude, pos.coords.longitude], { flying: true }),
+    () => showToast('Нет доступа к геолокации')
+  );
+}
+
+function buildWaveform() {
+  const wf = document.getElementById('wf');
+  wf.innerHTML = '';
+  for (let i = 0; i < 30; i++) {
+    const b = document.createElement('div');
+    b.className = 'wave-bar';
+    b.style.cssText = `height:${(Math.random()*65+20).toFixed(0)}%;animation-delay:${(i*0.05).toFixed(2)}s`;
+    wf.appendChild(b);
+  }
+}
+
+function setWavePlaying(playing) {
+  document.querySelectorAll('.wave-bar').forEach(b =>
+    b.style.animationPlayState = playing ? 'running' : 'paused'
+  );
+}
+
+function showLoading(txt) {
+  document.getElementById('loading-text').textContent = txt;
+  document.getElementById('loading').style.display = 'flex';
+}
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 4000);
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return s.replace(/"/g, '&quot;'); }
 </script>
 </body>
 </html>
