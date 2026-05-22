@@ -79,6 +79,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 }
 .addr-input:focus { border-color: #7ECBBD; }
 .addr-input::placeholder { color: #4a5568; }
+.addr-input.confirmed { border-color: #7ECBBD; background: #0d2520; }
 
 .btn-loc {
   width: 36px; height: 36px;
@@ -403,17 +404,15 @@ async function useMyLoc() {
     fromPt = { lat, lng, text: 'Моё местоположение' };
     inps[0].value = fromPt.text;
     try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
-        { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'StoryTrek/1.0' } }
-      );
-      const d = await r.json();
-      const a = d.address || {};
-      const s = [a.road || a.pedestrian || '', a.house_number || ''].filter(Boolean).join(', ');
-      const c = a.city || a.town || a.village || '';
-      const label = [s, c].filter(Boolean).join(', ');
-      if (label) { fromPt.text = label; inps[0].value = label; }
-    } catch { /* keep default */ }
+      /* reverse geocode with ymaps — no external service needed */
+      const result = await ymaps.geocode([lat, lng], { results: 1 });
+      const obj = result.geoObjects.get(0);
+      if (obj) {
+        const label = obj.properties.get('text') || obj.getAddressLine();
+        if (label) { fromPt.text = label; inps[0].value = label; }
+      }
+    } catch { /* keep "Моё местоположение" */ }
+    markConfirmed(0);
     setStatus('');
     updateBtn();
   }, () => setStatus('Нет доступа к геолокации', 'err'));
@@ -429,12 +428,15 @@ document.getElementById('btn-collapse').addEventListener('click', () => {
 /* ─── suggestions ─── */
 inps.forEach((inp, i) => {
   inp.addEventListener('input', e => {
+    inp.classList.remove('confirmed');
     if (i === 0) fromPt = null; else toPt = null;
     updateBtn();
     schedSug(i, e.target.value.trim());
   });
-  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 180));
+  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
   inp.addEventListener('focus', () => {
+    card.classList.remove('collapsed');
+    document.getElementById('btn-collapse').textContent = '—';
     if (inp.value.trim().length >= 2) schedSug(i, inp.value.trim());
   });
 });
@@ -442,46 +444,51 @@ inps.forEach((inp, i) => {
 function schedSug(i, val) {
   clearTimeout(sugTimers[i]);
   if (val.length < 2) { closeSug(i); return; }
-  sugTimers[i] = setTimeout(() => fetchSug(i, val), 280);
+  sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
 }
 
+/* Use ymaps.geocode — already loaded, works in Russia, no CORS issues */
 async function fetchSug(i, val) {
   try {
-    const r = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&limit=6&lang=ru`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    const d = await r.json();
-    renderSug(i, d.features || []);
-  } catch { /* silent */ }
+    const result = await ymaps.geocode(val, { results: 6 });
+    const objs = result.geoObjects.toArray();
+    if (!objs.length) { closeSug(i); return; }
+    renderSug(i, objs.map(o => ({
+      name: o.properties.get('name') || o.getAddressLine(),
+      full: o.properties.get('text') || o.getAddressLine(),
+      lat:  o.geometry.getCoordinates()[0],
+      lng:  o.geometry.getCoordinates()[1]
+    })));
+  } catch (e) {
+    console.error('geocode err', e);
+    closeSug(i);
+  }
 }
 
-function renderSug(i, features) {
+function renderSug(i, items) {
   const box = subs[i];
-  if (!features.length) { closeSug(i); return; }
+  if (!items.length) { closeSug(i); return; }
   box.innerHTML = '';
-  features.forEach(f => {
-    const p = f.properties;
-    const name = pName(p);
-    const sub  = pSub(p);
-    const ico  = pIcon(p.osm_value || p.type || '');
-    const item = document.createElement('div');
-    item.className = 'sug-item';
-    item.innerHTML = `<span class="sug-ico">${ico}</span>
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'sug-item';
+    const showSub = item.full && item.full !== item.name;
+    div.innerHTML = `<span class="sug-ico">📍</span>
       <div>
-        <div class="sug-name">${esc(name)}</div>
-        ${sub ? `<div class="sug-sub">${esc(sub)}</div>` : ''}
+        <div class="sug-name">${esc(item.name)}</div>
+        ${showSub ? `<div class="sug-sub">${esc(item.full)}</div>` : ''}
       </div>`;
-    item.addEventListener('mousedown', e => {
-      e.preventDefault();
-      const [lng, lat] = f.geometry.coordinates;
-      const pt = { lat, lng, text: name };
-      if (i === 0) { fromPt = pt; inps[0].value = name; }
-      else         { toPt   = pt; inps[1].value = name; }
+    /* pointerdown + preventDefault keeps input focused on mobile (prevents blur) */
+    div.addEventListener('pointerdown', e => e.preventDefault());
+    div.addEventListener('click', () => {
+      const pt = { lat: item.lat, lng: item.lng, text: item.name };
+      if (i === 0) { fromPt = pt; inps[0].value = item.name; }
+      else         { toPt   = pt; inps[1].value = item.name; }
+      markConfirmed(i);
       closeSug(i);
       updateBtn();
     });
-    box.appendChild(item);
+    box.appendChild(div);
   });
   box.classList.add('open');
   activeSug = i;
@@ -493,25 +500,11 @@ function closeSug(i) {
   if (activeSug === i) activeSug = -1;
 }
 
-function pName(p) {
-  if (p.street && p.housenumber) return `${p.street}, ${p.housenumber}`;
-  return p.name || p.street || p.city || '?';
+/* green border + tinted background = address confirmed */
+function markConfirmed(i) {
+  inps[i].classList.add('confirmed');
 }
-function pSub(p) {
-  const city = p.city || p.town || p.village;
-  return [city !== p.name ? city : null, p.country].filter(Boolean).join(', ');
-}
-function pIcon(t) {
-  t = t.toLowerCase();
-  if (['house','apartments','residential'].some(x => t.includes(x))) return '🏠';
-  if (t.includes('subway') || t.includes('metro'))  return '🚇';
-  if (t.includes('hotel') || t.includes('hostel'))  return '🏨';
-  if (t.includes('street') || t.includes('road'))   return '🛣️';
-  if (t.includes('city')  || t.includes('town'))    return '🏙️';
-  if (t.includes('park')  || t.includes('garden'))  return '🌿';
-  if (t.includes('museum'))                          return '🏛️';
-  return '📍';
-}
+
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
 /* ─── routing ─── */
