@@ -94,41 +94,31 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 }
 .btn-loc:hover { background: #263347; }
 
-/* ── suggestions dropdown  (position:fixed — outside card, above keyboard) ── */
+/* ── suggestions dropdown ── */
 .sug-box {
-  position: fixed;
-  z-index: 1000;
-  background: #1a2535;
-  border: 1.5px solid #2a3a50;
   border-radius: 10px;
+  border: 1.5px solid #2a3a50;
+  background: #1a2535;
+  overflow: hidden;
   display: none;
   flex-direction: column;
-  max-height: 50vh;
+  max-height: 220px;
   overflow-y: auto;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.65);
-  -webkit-overflow-scrolling: touch;
 }
 .sug-box.open { display: flex; }
 
 .sug-item {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 11px 14px;
+  padding: 9px 12px;
   cursor: pointer;
   border-bottom: 1px solid #212e42;
   transition: background .1s;
-  flex-shrink: 0;
 }
 .sug-item:last-child { border-bottom: none; }
-.sug-item:active, .sug-item:hover { background: #243044; }
-.sug-ico  { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; margin-top: 1px; }
-.sug-name { font-size: 14px; color: #e2e8f0; font-weight: 500; line-height: 1.4; }
-.sug-sub  { font-size: 12px; color: #64748b; line-height: 1.3; margin-top: 2px; }
-
-.sug-hint {
-  padding: 14px 16px;
-  font-size: 13px; color: #64748b;
-  text-align: center; flex-shrink: 0;
-}
+.sug-item:hover { background: #243044; }
+.sug-ico  { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; padding-top: 1px; }
+.sug-name { font-size: 13px; color: #e2e8f0; font-weight: 500; line-height: 1.3; }
+.sug-sub  { font-size: 11px; color: #64748b; line-height: 1.3; margin-top: 1px; }
 
 /* ── route button ── */
 #btn-route {
@@ -277,12 +267,14 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
       <input id="inp-from" class="addr-input" type="text" placeholder="Откуда" autocomplete="off" spellcheck="false">
       <button class="btn-loc" id="btn-my-loc" title="Моё место">⊙</button>
     </div>
+    <div id="sug-from" class="sug-box"></div>
 
     <!-- to -->
     <div class="input-wrap">
       <span class="dot dot-to"></span>
       <input id="inp-to" class="addr-input" type="text" placeholder="Куда" autocomplete="off" spellcheck="false">
     </div>
+    <div id="sug-to" class="sug-box"></div>
 
     <button id="btn-route" disabled>Построить маршрут</button>
 
@@ -310,10 +302,6 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
   </div>
 </div>
-
-<!-- suggestion dropdowns live here — outside card so overflow:hidden can't clip them -->
-<div id="sug-from" class="sug-box"></div>
-<div id="sug-to"   class="sug-box"></div>
 
 <button id="fab-locate" title="Моё местоположение">⊙</button>
 
@@ -445,12 +433,11 @@ inps.forEach((inp, i) => {
     updateBtn();
     schedSug(i, e.target.value.trim());
   });
-  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 250));
+  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
   inp.addEventListener('focus', () => {
     card.classList.remove('collapsed');
     document.getElementById('btn-collapse').textContent = '—';
-    const v = inp.value.trim();
-    if (v.length >= 2) schedSug(i, v);
+    if (inp.value.trim().length >= 2) schedSug(i, inp.value.trim());
   });
 });
 
@@ -460,89 +447,59 @@ function schedSug(i, val) {
   sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
 }
 
-/* Position the fixed dropdown under the corresponding input */
-function positionSug(i) {
-  const rect = inps[i].getBoundingClientRect();
-  const box  = subs[i];
-  box.style.top   = (rect.bottom + 4) + 'px';
-  box.style.left  = rect.left + 'px';
-  box.style.width = rect.width + 'px';
-}
-
-/*
- * ymaps.suggest — lightweight suggest endpoint, different from geocode.
- * Returns [{displayName, value}] for real-time autocomplete.
- * On selection we call ymaps.geocode(value) once to get coordinates.
- */
+/* Use ymaps.geocode — already loaded, works in Russia, no CORS issues */
 async function fetchSug(i, val) {
-  if (typeof ymaps === 'undefined') return;
-
-  /* show loading state immediately */
-  positionSug(i);
-  subs[i].innerHTML = '<div class="sug-hint">Ищем…</div>';
-  subs[i].classList.add('open');
-  activeSug = i;
-
+  if (typeof ymaps === 'undefined' || !ymaps.geocode) return;
   try {
-    const items = await ymaps.suggest(val, { results: 8 });
-    if (activeSug !== i) return; /* user moved to other input */
-
-    if (!items || !items.length) {
-      subs[i].innerHTML = '<div class="sug-hint">Адреса не найдены</div>';
-      return;
-    }
+    const result = await ymaps.geocode(val, { results: 6 });
+    const objs = result.geoObjects.toArray();
+    if (!objs.length) { closeSug(i); return; }
+    const items = objs
+      .filter(o => o.geometry && o.geometry.getCoordinates())
+      .map(o => {
+        const coords = o.geometry.getCoordinates();
+        return {
+          name: o.properties.get('name') || o.properties.get('text') || val,
+          full: o.properties.get('text') || '',
+          lat:  coords[0],
+          lng:  coords[1]
+        };
+      })
+      .filter(it => it.lat && it.lng);
     renderSug(i, items);
   } catch (e) {
-    console.error('suggest err', e);
-    if (activeSug === i) {
-      subs[i].innerHTML = `<div class="sug-hint">Ошибка: ${esc(e.message || String(e))}</div>`;
-    }
+    console.error('geocode err', e);
+    closeSug(i);
   }
 }
 
 function renderSug(i, items) {
   const box = subs[i];
+  if (!items.length) { closeSug(i); return; }
   box.innerHTML = '';
   items.forEach(item => {
-    const name = item.displayName || item.value || '';
-    const val  = item.value || name;
-
     const div = document.createElement('div');
     div.className = 'sug-item';
+    const showSub = item.full && item.full !== item.name;
     div.innerHTML = `<span class="sug-ico">📍</span>
-      <div><div class="sug-name">${esc(name)}</div></div>`;
-
-    /* pointerdown + preventDefault: keeps keyboard open & prevents blur on iOS */
+      <div>
+        <div class="sug-name">${esc(item.name)}</div>
+        ${showSub ? `<div class="sug-sub">${esc(item.full)}</div>` : ''}
+      </div>`;
+    /* pointerdown + preventDefault keeps input focused on mobile (prevents blur) */
     div.addEventListener('pointerdown', e => e.preventDefault());
     div.addEventListener('click', () => {
-      inps[i].value = name;
-      inps[i].classList.remove('confirmed');
+      const pt = { lat: item.lat, lng: item.lng, text: item.name };
+      if (i === 0) { fromPt = pt; inps[0].value = item.name; }
+      else         { toPt   = pt; inps[1].value = item.name; }
+      markConfirmed(i);
       closeSug(i);
-      geocodeSelected(i, val, name);
+      updateBtn();
     });
     box.appendChild(div);
   });
-  positionSug(i); /* recalculate in case layout shifted */
   box.classList.add('open');
   activeSug = i;
-}
-
-/* Geocode the selected suggestion to get lat/lng */
-async function geocodeSelected(i, query, displayName) {
-  setStatus('Определяем адрес…', 'info');
-  try {
-    const result = await ymaps.geocode(query, { results: 1 });
-    const obj = result.geoObjects.get(0);
-    if (!obj || !obj.geometry) throw new Error('Координаты не найдены');
-    const coords = obj.geometry.getCoordinates();
-    const pt = { lat: coords[0], lng: coords[1], text: displayName };
-    if (i === 0) fromPt = pt; else toPt = pt;
-    markConfirmed(i);
-    updateBtn();
-    setStatus('');
-  } catch (e) {
-    setStatus('Не удалось определить адрес: ' + e.message, 'err');
-  }
 }
 
 function closeSug(i) {
