@@ -449,16 +449,24 @@ function schedSug(i, val) {
 
 /* Use ymaps.geocode — already loaded, works in Russia, no CORS issues */
 async function fetchSug(i, val) {
+  if (typeof ymaps === 'undefined' || !ymaps.geocode) return;
   try {
     const result = await ymaps.geocode(val, { results: 6 });
     const objs = result.geoObjects.toArray();
     if (!objs.length) { closeSug(i); return; }
-    renderSug(i, objs.map(o => ({
-      name: o.properties.get('name') || o.getAddressLine(),
-      full: o.properties.get('text') || o.getAddressLine(),
-      lat:  o.geometry.getCoordinates()[0],
-      lng:  o.geometry.getCoordinates()[1]
-    })));
+    const items = objs
+      .filter(o => o.geometry && o.geometry.getCoordinates())
+      .map(o => {
+        const coords = o.geometry.getCoordinates();
+        return {
+          name: o.properties.get('name') || o.properties.get('text') || val,
+          full: o.properties.get('text') || '',
+          lat:  coords[0],
+          lng:  coords[1]
+        };
+      })
+      .filter(it => it.lat && it.lng);
+    renderSug(i, items);
   } catch (e) {
     console.error('geocode err', e);
     closeSug(i);
