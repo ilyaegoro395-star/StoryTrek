@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>StoryTrek</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; }
+
+/* ── full-screen map ── */
+#map { position: fixed; inset: 0; z-index: 0; }
+
+/* ── floating search card ── */
+#card {
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 20;
+  width: 340px;
+  max-height: calc(100vh - 24px);
+  background: #111827;
+  border-radius: 16px;
+  border: 1px solid #1e2d40;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* header */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  flex-shrink: 0;
+}
+.logo { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+.logo span { color: #7ECBBD; }
+
+.btn-collapse {
+  background: none; border: none; color: #4a5568;
+  font-size: 20px; cursor: pointer; padding: 0 2px;
+  line-height: 1; display: flex; align-items: center;
+}
+.btn-collapse:hover { color: #e2e8f0; }
+
+/* collapsed state: only header visible */
+#card.collapsed .card-body { display: none; }
+
+/* card body */
+.card-body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── inputs ── */
+.input-wrap { position: relative; display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dot-from { background: #7ECBBD; }
+.dot-to   { background: #f87171; }
+
+.addr-input {
+  flex: 1;
+  background: #1a2535;
+  border: 1.5px solid #2a3a50;
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+  min-width: 0;
+  transition: border-color .15s;
+}
+.addr-input:focus { border-color: #7ECBBD; }
+.addr-input::placeholder { color: #4a5568; }
+
+.btn-loc {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: #1a2535;
+  border: 1.5px solid #2a3a50;
+  color: #7ECBBD;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.btn-loc:hover { background: #263347; }
+
+/* ── suggestions dropdown ── */
+.sug-box {
+  border-radius: 10px;
+  border: 1.5px solid #2a3a50;
+  background: #1a2535;
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.sug-box.open { display: flex; }
+
+.sug-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #212e42;
+  transition: background .1s;
+}
+.sug-item:last-child { border-bottom: none; }
+.sug-item:hover { background: #243044; }
+.sug-ico  { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; padding-top: 1px; }
+.sug-name { font-size: 13px; color: #e2e8f0; font-weight: 500; line-height: 1.3; }
+.sug-sub  { font-size: 11px; color: #64748b; line-height: 1.3; margin-top: 1px; }
+
+/* ── route button ── */
+#btn-route {
+  width: 100%;
+  padding: 11px;
+  background: #7ECBBD;
+  color: #0d1117;
+  font-size: 14px; font-weight: 700;
+  border: none; border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+  flex-shrink: 0;
+}
+#btn-route:hover    { background: #6bbcae; }
+#btn-route:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── route stats strip ── */
+#route-strip {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  background: #1a2535;
+  border-radius: 10px;
+  padding: 9px 12px;
+  flex-shrink: 0;
+}
+#route-strip.visible { display: flex; }
+.rs-stat { text-align: center; }
+.rs-val  { font-size: 15px; font-weight: 700; color: #7ECBBD; }
+.rs-lbl  { font-size: 11px; color: #64748b; margin-top: 1px; }
+.btn-strip-clear { background: none; border: none; color: #4a5568; font-size: 18px; cursor: pointer; }
+.btn-strip-clear:hover { color: #e2e8f0; }
+
+/* ── guide & nav (after route) ── */
+#guide-section { display: none; flex-direction: column; gap: 8px; flex-shrink: 0; }
+#guide-section.visible { display: flex; }
+
+#btn-guide {
+  width: 100%; padding: 11px;
+  background: #172a40;
+  color: #7ECBBD;
+  font-size: 14px; font-weight: 600;
+  border: 1.5px solid #2a4a6a;
+  border-radius: 10px;
+  cursor: pointer; transition: background .15s;
+}
+#btn-guide:hover { background: #1e3a55; }
+#btn-guide:disabled { opacity: .4; cursor: not-allowed; }
+
+/* guide text */
+#guide-text-wrap { display: none; max-height: 200px; overflow-y: auto; }
+#guide-text-wrap.visible { display: block; }
+#guide-text {
+  background: #1a2535;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px; line-height: 1.7;
+  color: #cbd5e1;
+}
+.seg {
+  padding: 7px 9px; border-radius: 7px; margin-bottom: 5px;
+  cursor: pointer; transition: background .1s;
+  border-left: 3px solid transparent;
+}
+.seg:last-child { margin-bottom: 0; }
+.seg:hover  { background: #243044; }
+.seg.active { background: #172a40; border-left-color: #7ECBBD; color: #e2e8f0; }
+
+/* nav bar */
+#nav-bar { display: none; align-items: center; gap: 6px; flex-shrink: 0; }
+#nav-bar.visible { display: flex; }
+#btn-nav-start {
+  flex: 1; padding: 11px;
+  background: #7ECBBD; color: #0d1117;
+  font-size: 14px; font-weight: 700;
+  border: none; border-radius: 10px; cursor: pointer;
+}
+#btn-nav-start:hover { background: #6bbcae; }
+.nav-ctrl-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; cursor: pointer;
+  display: none;
+}
+#btn-pause { background: #1a2535; border: 1.5px solid #2a3a50; color: #e2e8f0; }
+#btn-pause:hover { background: #263347; }
+#btn-stop  { background: #2d1a1a; border: 1.5px solid #4a2a2a; color: #f87171; }
+#btn-stop:hover  { background: #3d2020; }
+
+/* status line */
+#status {
+  font-size: 12px; color: #64748b; text-align: center;
+  min-height: 16px; flex-shrink: 0;
+}
+#status.info { color: #7ECBBD; }
+#status.err  { color: #f87171; }
+
+/* ── locate FAB (bottom-right) ── */
+#fab-locate {
+  position: fixed;
+  right: 14px; bottom: 24px;
+  z-index: 20;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #111827dd;
+  border: 1px solid #1e2d40;
+  color: #7ECBBD;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+}
+#fab-locate:hover { background: #1a2535dd; }
+
+/* ── position marker (referenced from ymaps template) ── */
+@keyframes pos-pulse {
+  0%   { transform:scale(1);   opacity:.7 }
+  70%  { transform:scale(2.3); opacity:0  }
+  100% { transform:scale(2.3); opacity:0  }
+}
+.my-pos-ripple { position:absolute; left:-10px; top:-10px; width:20px; height:20px; border-radius:50%; background:rgba(58,125,230,.4); animation:pos-pulse 2s ease-out infinite; }
+.my-pos-dot    { position:absolute; left:-8px;  top:-8px;  width:16px; height:16px; border-radius:50%; background:#3a7de6; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+
+/* ── mobile: card goes full-width at top ── */
+@media (max-width: 420px) {
+  #card { left: 0; right: 0; top: 0; width: 100%; border-radius: 0 0 16px 16px; border-top: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- floating search card -->
+<div id="card">
+  <div class="card-head">
+    <div class="logo">Story<span>Trek</span></div>
+    <button class="btn-collapse" id="btn-collapse" title="Свернуть">—</button>
+  </div>
+
+  <div class="card-body">
+
+    <!-- from -->
+    <div class="input-wrap">
+      <span class="dot dot-from"></span>
+      <input id="inp-from" class="addr-input" type="text" placeholder="Откуда" autocomplete="off" spellcheck="false">
+      <button class="btn-loc" id="btn-my-loc" title="Моё место">⊙</button>
+    </div>
+    <div id="sug-from" class="sug-box"></div>
+
+    <!-- to -->
+    <div class="input-wrap">
+      <span class="dot dot-to"></span>
+      <input id="inp-to" class="addr-input" type="text" placeholder="Куда" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="sug-to" class="sug-box"></div>
+
+    <button id="btn-route" disabled>Построить маршрут</button>
+
+    <!-- stats after route -->
+    <div id="route-strip">
+      <div class="rs-stat"><div class="rs-val" id="rs-dist">—</div><div class="rs-lbl">расстояние</div></div>
+      <div class="rs-stat"><div class="rs-val" id="rs-dur">—</div><div class="rs-lbl">пешком</div></div>
+      <button class="btn-strip-clear" id="btn-clear">✕</button>
+    </div>
+
+    <!-- guide -->
+    <div id="guide-section">
+      <button id="btn-guide">✦ Создать аудиогид</button>
+
+      <div id="nav-bar">
+        <button id="btn-nav-start">▶ Навигация</button>
+        <button class="nav-ctrl-btn" id="btn-pause">⏸</button>
+        <button class="nav-ctrl-btn" id="btn-stop">■</button>
+      </div>
+
+      <div id="guide-text-wrap"><div id="guide-text"></div></div>
+    </div>
+
+    <div id="status"></div>
+
+  </div>
+</div>
+
+<button id="fab-locate" title="Моё местоположение">⊙</button>
+
+<script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
+<script>
+'use strict';
+
+/* ─── state ─── */
+let ymap = null;
+let myMarker = null;
+let myPos    = null;
+let posWatch = null;
+
+let fromPt = null;  // {lat, lng, text}
+let toPt   = null;
+
+let routeCoords  = [];
+let routeLine    = null;
+let routeMarkers = [];
+
+let segments  = [];
+let segCoords = [];
+let currentSeg = -1;
+let audio = null;
+let navActive = false;
+let navPaused = false;
+
+let sugTimers  = [null, null];
+let activeSug  = -1;
+
+/* ─── DOM ─── */
+const inps  = [document.getElementById('inp-from'), document.getElementById('inp-to')];
+const subs  = [document.getElementById('sug-from'), document.getElementById('sug-to')];
+const btnRoute    = document.getElementById('btn-route');
+const routeStrip  = document.getElementById('route-strip');
+const rsDist      = document.getElementById('rs-dist');
+const rsDur       = document.getElementById('rs-dur');
+const btnClear    = document.getElementById('btn-clear');
+const guideSec    = document.getElementById('guide-section');
+const btnGuide    = document.getElementById('btn-guide');
+const navBar      = document.getElementById('nav-bar');
+const btnNavStart = document.getElementById('btn-nav-start');
+const btnPause    = document.getElementById('btn-pause');
+const btnStop     = document.getElementById('btn-stop');
+const guideWrap   = document.getElementById('guide-text-wrap');
+const guideText   = document.getElementById('guide-text');
+const statusEl    = document.getElementById('status');
+
+/* ─── map init ─── */
+ymaps.ready(() => {
+  ymap = new ymaps.Map('map', {
+    center: [55.751244, 37.618423], zoom: 12, controls: ['zoomControl']
+  }, { suppressMapOpenError: true });
+  ymap.controls.get('zoomControl').options.set({ position: { right: 14, top: 80 } });
+  startPosWatch();
+});
+
+/* ─── geolocation ─── */
+function startPosWatch() {
+  if (!navigator.geolocation) return;
+  posWatch = navigator.geolocation.watchPosition(
+    pos => {
+      myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setMyMarker([myPos.lat, myPos.lng]);
+      if (navActive && !navPaused) onNavPosition(myPos);
+    },
+    () => {},
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+function setMyMarker(coord) {
+  if (!myMarker) {
+    const L = ymaps.templateLayoutFactory.createClass(
+      '<div class="my-pos-ripple"></div><div class="my-pos-dot"></div>'
+    );
+    myMarker = new ymaps.Placemark(coord, {}, {
+      iconLayout: L,
+      iconShape: { type: 'Circle', coordinates: [0,0], radius: 12 }
+    });
+    ymap.geoObjects.add(myMarker);
+  } else {
+    myMarker.geometry.setCoordinates(coord);
+  }
+}
+
+document.getElementById('fab-locate').addEventListener('click', () => {
+  if (myPos) ymap.setCenter([myPos.lat, myPos.lng], 15, { duration: 400 });
+  else navigator.geolocation?.getCurrentPosition(
+    p => ymap.setCenter([p.coords.latitude, p.coords.longitude], 15, { duration: 400 })
+  );
+});
+
+document.getElementById('btn-my-loc').addEventListener('click', useMyLoc);
+async function useMyLoc() {
+  if (!navigator.geolocation) return;
+  setStatus('Определяем местоположение…', 'info');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    fromPt = { lat, lng, text: 'Моё местоположение' };
+    inps[0].value = fromPt.text;
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
+        { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'StoryTrek/1.0' } }
+      );
+      const d = await r.json();
+      const a = d.address || {};
+      const s = [a.road || a.pedestrian || '', a.house_number || ''].filter(Boolean).join(', ');
+      const c = a.city || a.town || a.village || '';
+      const label = [s, c].filter(Boolean).join(', ');
+      if (label) { fromPt.text = label; inps[0].value = label; }
+    } catch { /* keep default */ }
+    setStatus('');
+    updateBtn();
+  }, () => setStatus('Нет доступа к геолокации', 'err'));
+}
+
+/* ─── collapse toggle ─── */
+const card = document.getElementById('card');
+document.getElementById('btn-collapse').addEventListener('click', () => {
+  card.classList.toggle('collapsed');
+  document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '—';
+});
+
+/* ─── suggestions ─── */
+inps.forEach((inp, i) => {
+  inp.addEventListener('input', e => {
+    if (i === 0) fromPt = null; else toPt = null;
+    updateBtn();
+    schedSug(i, e.target.value.trim());
+  });
+  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 180));
+  inp.addEventListener('focus', () => {
+    if (inp.value.trim().length >= 2) schedSug(i, inp.value.trim());
+  });
+});
+
+function schedSug(i, val) {
+  clearTimeout(sugTimers[i]);
+  if (val.length < 2) { closeSug(i); return; }
+  sugTimers[i] = setTimeout(() => fetchSug(i, val), 280);
+}
+
+async function fetchSug(i, val) {
+  try {
+    const r = await fetch(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&limit=6&lang=ru`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const d = await r.json();
+    renderSug(i, d.features || []);
+  } catch { /* silent */ }
+}
+
+function renderSug(i, features) {
+  const box = subs[i];
+  if (!features.length) { closeSug(i); return; }
+  box.innerHTML = '';
+  features.forEach(f => {
+    const p = f.properties;
+    const name = pName(p);
+    const sub  = pSub(p);
+    const ico  = pIcon(p.osm_value || p.type || '');
+    const item = document.createElement('div');
+    item.className = 'sug-item';
+    item.innerHTML = `<span class="sug-ico">${ico}</span>
+      <div>
+        <div class="sug-name">${esc(name)}</div>
+        ${sub ? `<div class="sug-sub">${esc(sub)}</div>` : ''}
+      </div>`;
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const [lng, lat] = f.geometry.coordinates;
+      const pt = { lat, lng, text: name };
+      if (i === 0) { fromPt = pt; inps[0].value = name; }
+      else         { toPt   = pt; inps[1].value = name; }
+      closeSug(i);
+      updateBtn();
+    });
+    box.appendChild(item);
+  });
+  box.classList.add('open');
+  activeSug = i;
+}
+
+function closeSug(i) {
+  subs[i].classList.remove('open');
+  subs[i].innerHTML = '';
+  if (activeSug === i) activeSug = -1;
+}
+
+function pName(p) {
+  if (p.street && p.housenumber) return `${p.street}, ${p.housenumber}`;
+  return p.name || p.street || p.city || '?';
+}
+function pSub(p) {
+  const city = p.city || p.town || p.village;
+  return [city !== p.name ? city : null, p.country].filter(Boolean).join(', ');
+}
+function pIcon(t) {
+  t = t.toLowerCase();
+  if (['house','apartments','residential'].some(x => t.includes(x))) return '🏠';
+  if (t.includes('subway') || t.includes('metro'))  return '🚇';
+  if (t.includes('hotel') || t.includes('hostel'))  return '🏨';
+  if (t.includes('street') || t.includes('road'))   return '🛣️';
+  if (t.includes('city')  || t.includes('town'))    return '🏙️';
+  if (t.includes('park')  || t.includes('garden'))  return '🌿';
+  if (t.includes('museum'))                          return '🏛️';
+  return '📍';
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+/* ─── routing ─── */
+function updateBtn() {
+  btnRoute.disabled = !(fromPt && toPt);
+}
+
+btnRoute.addEventListener('click', buildRoute);
+
+async function buildRoute() {
+  if (!fromPt || !toPt) return;
+  closeSug(0); closeSug(1);
+  setStatus('Строим маршрут…', 'info');
+  btnRoute.disabled = true;
+
+  try {
+    const pts = [fromPt, toPt];
+    const cs  = pts.map(w => `${w.lng},${w.lat}`).join(';');
+    const r   = await fetch(
+      `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    const d = await r.json();
+    if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+
+    const route = d.routes[0];
+    const distM = Math.round(route.distance);
+    const durSec = Math.round(route.duration);
+    routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+    rsDist.textContent = distM >= 1000 ? `${(distM/1000).toFixed(1)} км` : `${distM} м`;
+    const dm = Math.round(durSec/60);
+    rsDur.textContent = dm >= 60 ? `${Math.floor(dm/60)} ч ${dm%60} мин` : `${dm} мин`;
+
+    drawRoute(routeCoords, pts);
+    routeStrip.classList.add('visible');
+    guideSec.classList.add('visible');
+    setStatus('');
+  } catch (e) {
+    setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+  } finally {
+    btnRoute.disabled = false;
+  }
+}
+
+function drawRoute(coords, pts) {
+  clearRoute();
+  routeLine = new ymaps.GeoObject(
+    { geometry: { type: 'LineString', coordinates: coords } },
+    { geodesic: false, strokeWidth: 5, strokeColor: '#7ECBBD', strokeOpacity: 0.88 }
+  );
+  ymap.geoObjects.add(routeLine);
+  pts.forEach((p, i) => {
+    const m = new ymaps.Placemark([p.lat, p.lng], {}, {
+      preset: 'islands#circleIcon',
+      iconColor: i === 0 ? '#7ECBBD' : '#f87171'
+    });
+    ymap.geoObjects.add(m);
+    routeMarkers.push(m);
+  });
+  const lats = coords.map(c => c[0]), lngs = coords.map(c => c[1]);
+  ymap.setBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
+    { checkZoomRange: true, duration: 600, margin: 60 });
+}
+
+function clearRoute() {
+  if (routeLine) { ymap.geoObjects.remove(routeLine); routeLine = null; }
+  routeMarkers.forEach(m => ymap.geoObjects.remove(m));
+  routeMarkers = [];
+}
+
+btnClear.addEventListener('click', () => {
+  clearRoute(); routeCoords = [];
+  segments = []; segCoords = [];
+  routeStrip.classList.remove('visible');
+  guideSec.classList.remove('visible');
+  guideWrap.classList.remove('visible');
+  navBar.classList.remove('visible');
+  guideText.innerHTML = '';
+  stopNav(); setStatus('');
+});
+
+/* ─── guide generation ─── */
+btnGuide.addEventListener('click', generateGuide);
+
+async function generateGuide() {
+  btnGuide.disabled = true;
+  setStatus('Создаём аудиогид…', 'info');
+  try {
+    const r = await fetch('/api/generate-guide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ routeDescription: `От «${fromPt.text}» до «${toPt.text}»` }),
+      signal: AbortSignal.timeout(45000)
+    });
+    const data = await r.json();
+    if (!data.text) throw new Error(data.error || 'No text');
+    segments = data.text.split('\n\n').map(s => s.trim()).filter(Boolean);
+    assignSegs();
+    renderGuide();
+    navBar.classList.add('visible');
+    guideWrap.classList.add('visible');
+    setStatus(`Готово — ${segments.length} фрагментов`);
+  } catch (e) {
+    setStatus('Ошибка: ' + e.message, 'err');
+  } finally {
+    btnGuide.disabled = false;
+  }
+}
+
+function assignSegs() {
+  if (!routeCoords.length) return;
+  segCoords = segments.map((_, i) => {
+    const idx = Math.round(i * (routeCoords.length - 1) / Math.max(segments.length - 1, 1));
+    return routeCoords[Math.min(idx, routeCoords.length - 1)];
+  });
+}
+
+function renderGuide() {
+  guideText.innerHTML = '';
+  segments.forEach((txt, i) => {
+    const d = document.createElement('div');
+    d.className = 'seg';
+    d.textContent = txt;
+    d.addEventListener('click', () => playSegment(i));
+    guideText.appendChild(d);
+  });
+}
+
+/* ─── TTS ─── */
+async function synthesizeSeg(idx) {
+  try {
+    const r = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: segments[idx], voice: 'alena', speed: '0.95' }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.blob();
+  } catch { return null; }
+}
+
+async function playSegment(idx) {
+  if (audio) { audio.pause(); audio = null; }
+  if (idx < 0 || idx >= segments.length) return;
+  document.querySelectorAll('.seg').forEach((el, i) => el.classList.toggle('active', i === idx));
+  currentSeg = idx;
+  setStatus('Загружаем аудио…', 'info');
+  const blob = await synthesizeSeg(idx);
+  if (!blob) { browserTTS(segments[idx]); setStatus(''); return; }
+  const url = URL.createObjectURL(blob);
+  audio = new Audio(url);
+  audio.onended = () => { URL.revokeObjectURL(url); setStatus(''); };
+  audio.play().catch(() => browserTTS(segments[idx]));
+  setStatus('');
+}
+
+function browserTTS(text) {
+  if (!window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ru-RU';
+  speechSynthesis.speak(u);
+}
+
+/* ─── navigation ─── */
+btnNavStart.addEventListener('click', startNav);
+btnPause.addEventListener('click', togglePause);
+btnStop.addEventListener('click', stopNav);
+
+function startNav() {
+  navActive = true; navPaused = false;
+  btnNavStart.style.display = 'none';
+  btnPause.style.display = 'flex';
+  btnStop.style.display  = 'flex';
+  setStatus('Навигация активна', 'info');
+  playSegment(0);
+}
+function togglePause() {
+  navPaused = !navPaused;
+  btnPause.textContent = navPaused ? '▶' : '⏸';
+  if (navPaused && audio) audio.pause();
+  else if (!navPaused && audio) audio.play().catch(() => {});
+  setStatus(navPaused ? 'Пауза' : 'Навигация активна', 'info');
+}
+function stopNav() {
+  navActive = false; navPaused = false;
+  if (audio) { audio.pause(); audio = null; }
+  window.speechSynthesis?.cancel();
+  btnNavStart.style.display = '';
+  btnPause.style.display = 'none';
+  btnStop.style.display  = 'none';
+  btnPause.textContent = '⏸';
+  currentSeg = -1;
+  document.querySelectorAll('.seg').forEach(el => el.classList.remove('active'));
+  setStatus('');
+}
+
+function haversine(a, b) {
+  const R = 6371000;
+  const dLat = (b[0]-a[0])*Math.PI/180, dLng = (b[1]-a[1])*Math.PI/180;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+function onNavPosition(pos) {
+  if (!navActive || navPaused || !segCoords.length) return;
+  const me = [pos.lat, pos.lng];
+  segCoords.forEach((coord, i) => {
+    if (i <= currentSeg) return;
+    if (haversine(me, coord) < 80) playSegment(i);
+  });
+}
+
+/* ─── status ─── */
+function setStatus(msg, type = '') {
+  statusEl.textContent = msg;
+  statusEl.className   = type;
+}
+</script>
+</body>
+</html>
