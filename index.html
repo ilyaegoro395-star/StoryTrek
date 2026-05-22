@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StoryTrek — Твой карманный экскурсовод</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU" type="text/javascript"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -127,56 +128,26 @@
   .nav-item.active { color: #7ECBBD; }
   .nav-item i { font-size: 22px; }
 
-  /* MAP HERO */
-  .hero-map {
-    height: 200px;
-    background: #0a0f1e;
-    position: relative; overflow: hidden;
+  /* MAP CONTAINERS */
+  .map-wrap {
+    position: relative;
+    overflow: hidden;
   }
-  .map-grid {
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(126,203,189,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(126,203,189,0.07) 1px, transparent 1px);
-    background-size: 28px 28px;
+  .map-wrap .ymap {
+    width: 100%;
+    height: 100%;
   }
-  .map-roads {
-    position: absolute; inset: 0;
-  }
-  .map-route {
-    position: absolute;
-    top: 50%; left: 8%;
-    width: 84%; height: 2px;
-    background: linear-gradient(90deg, transparent, #7ECBBD 20%, #7ECBBD 80%, transparent);
-    transform: translateY(-50%);
-  }
-  .map-route-v {
-    position: absolute;
-    top: 30%; left: 48%;
-    width: 2px; height: 40%;
-    background: linear-gradient(180deg, transparent, #7ECBBD 30%, #E8845C 70%, transparent);
-  }
-  .map-pin {
-    position: absolute;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    border: 2px solid #fff;
-    transform: translate(-50%, -50%);
-  }
-  .map-pin.start { background: #7ECBBD; top: 50%; left: 10%; }
-  .map-pin.mid   { background: #E8845C; top: 42%; left: 50%; }
-  .map-pin.end   { background: #7ECBBD; top: 50%; left: 88%; }
-  .map-label {
-    position: absolute;
-    font-size: 9px; color: rgba(255,255,255,0.5);
-    white-space: nowrap;
-  }
+  /* Disable Yandex Maps copyright/logo overlay clicks from breaking UI */
+  .map-wrap [class*="ymaps-2"] a { pointer-events: none; }
+
   .map-overlay {
     position: absolute; bottom: 12px; left: 12px; right: 12px;
     background: rgba(0,0,0,0.65);
     border-radius: 12px; padding: 8px 12px;
     display: flex; align-items: center; gap: 8px;
     backdrop-filter: blur(4px);
+    z-index: 10;
+    pointer-events: none;
   }
   .map-overlay .pulse {
     width: 8px; height: 8px; border-radius: 50%; background: #7ECBBD; flex-shrink: 0;
@@ -186,6 +157,14 @@
   @keyframes pulse {
     0%,100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(126,203,189,0.4); }
     50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 0 4px rgba(126,203,189,0); }
+  }
+
+  .active-badge {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(232,132,92,0.9);
+    border-radius: 8px; padding: 4px 10px;
+    font-size: 11px; color: #fff; font-weight: 600;
+    z-index: 10; pointer-events: none;
   }
 
   /* SEARCH */
@@ -321,7 +300,13 @@
     padding: 48px 20px 18px;
     display: flex; flex-direction: column; justify-content: flex-end;
   }
-  .detail-hero .map-grid { opacity: 0.5; }
+  .map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(126,203,189,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,203,189,0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
   .detail-hero .detail-title { font-size: 22px; font-weight: 700; color: #fff; position: relative; z-index: 1; }
   .detail-hero .detail-sub   { font-size: 12px; color: rgba(255,255,255,0.5); position: relative; z-index: 1; margin-top: 4px; }
 
@@ -530,13 +515,9 @@
         </button>
       </div>
       <div class="content">
-        <div class="hero-map">
-          <div class="map-grid"></div>
-          <div class="map-route"></div>
-          <div class="map-route-v"></div>
-          <div class="map-pin start"></div>
-          <div class="map-pin mid"></div>
-          <div class="map-pin end"></div>
+        <!-- Яндекс Карта -->
+        <div class="map-wrap" style="height:200px;">
+          <div id="map-home" class="ymap"></div>
           <div class="map-overlay">
             <div class="pulse"></div>
             <span>Москва · Исторический центр</span>
@@ -620,13 +601,10 @@
         </div>
       </div>
       <div class="content">
-        <div class="hero-map" style="height:160px;">
-          <div class="map-grid"></div>
-          <div class="map-route"></div>
-          <div class="map-pin start"></div>
-          <div class="map-pin mid" style="background:#E8845C; animation:pulse 1.5s infinite;"></div>
-          <div class="map-pin end"></div>
-          <div style="position:absolute;top:12px;right:12px;background:rgba(232,132,92,0.85);border-radius:8px;padding:4px 10px;font-size:11px;color:#fff;font-weight:600;">● Вы здесь</div>
+        <!-- Яндекс Карта с маршрутом -->
+        <div class="map-wrap" style="height:180px;">
+          <div id="map-active" class="ymap"></div>
+          <div class="active-badge">● Вы здесь</div>
         </div>
         <div class="active-banner">
           <div class="label">Активный маршрут</div>
@@ -689,9 +667,6 @@
       </div>
       <div class="detail-hero">
         <div class="map-grid"></div>
-        <div class="map-route"></div>
-        <div class="map-pin start"></div>
-        <div class="map-pin end"></div>
         <button onclick="showScreen('home')" style="position:absolute;top:40px;left:14px;z-index:2;width:34px;height:34px;background:rgba(0,0,0,0.45);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;" aria-label="Назад">
           <i class="ti ti-arrow-left" style="color:#fff;font-size:16px;"></i>
         </button>
@@ -816,12 +791,25 @@
 </div><!-- /app-wrapper -->
 
 <script>
+// ── Навигация по экранам ──────────────────────────────────────────────────
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
   document.querySelectorAll('.screen-tabs button').forEach(b => b.classList.remove('active-tab'));
   const t = document.getElementById('tab-' + name);
   if (t) t.classList.add('active-tab');
+
+  // Инициализируем карту при первом показе экрана, потом подстраиваем размер
+  setTimeout(() => {
+    if (name === 'home') {
+      if (!maps.home) initHomeMap();
+      else maps.home.container.fitToViewport();
+    }
+    if (name === 'active') {
+      if (!maps.active) initActiveMap();
+      else maps.active.container.fitToViewport();
+    }
+  }, 60);
 }
 
 function selectVoice(el) {
@@ -829,6 +817,7 @@ function selectVoice(el) {
   el.classList.add('selected');
 }
 
+// ── Waveform ──────────────────────────────────────────────────────────────
 const wf = document.getElementById('waveform');
 if (wf) {
   for (let i = 0; i < 30; i++) {
@@ -840,6 +829,94 @@ if (wf) {
     wf.appendChild(bar);
   }
 }
+
+// ── Яндекс Карты ─────────────────────────────────────────────────────────
+const maps = {};
+
+// Координаты маршрута по Арбату [lat, lon]
+const ARBAT_ROUTE = [
+  [55.7491, 37.5834], // Смоленская
+  [55.7500, 37.5868], // Начало Арбата
+  [55.7506, 37.5904], // Театр Вахтангова
+  [55.7512, 37.5947], // Дом Пушкина
+  [55.7518, 37.5978], // Арбатская площадь
+  [55.7523, 37.6030]  // Арбатские ворота
+];
+
+function makeMarkerIcon(color) {
+  return ymaps.templateLayoutFactory.createClass(
+    '<div style="width:14px;height:14px;background:' + color + ';border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);transform:translate(-7px,-7px);"></div>'
+  );
+}
+
+function initHomeMap() {
+  maps.home = new ymaps.Map('map-home', {
+    center: [55.752, 37.604],
+    zoom: 12,
+    controls: []
+  }, { suppressMapOpenBlock: true });
+
+  // Маркеры маршрутов
+  const tours = [
+    { coords: [55.7508, 37.5925], color: '#7ECBBD', hint: 'Арбат и окрестности' },
+    { coords: [55.7539, 37.6208], color: '#E8845C', hint: 'Красная площадь' },
+  ];
+  tours.forEach(t => {
+    maps.home.geoObjects.add(new ymaps.Placemark(t.coords, { hintContent: t.hint }, {
+      iconLayout: makeMarkerIcon(t.color),
+      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
+    }));
+  });
+}
+
+function initActiveMap() {
+  maps.active = new ymaps.Map('map-active', {
+    center: [55.7508, 37.5930],
+    zoom: 15,
+    controls: []
+  }, { suppressMapOpenBlock: true });
+
+  // Пройденный отрезок маршрута (серый)
+  maps.active.geoObjects.add(new ymaps.Polyline(
+    ARBAT_ROUTE.slice(0, 3),
+    {},
+    { strokeColor: '#4a5568', strokeWidth: 4, strokeOpacity: 0.8 }
+  ));
+
+  // Оставшийся маршрут (зелёный)
+  maps.active.geoObjects.add(new ymaps.Polyline(
+    ARBAT_ROUTE.slice(2),
+    {},
+    { strokeColor: '#7ECBBD', strokeWidth: 4, strokeOpacity: 0.9 }
+  ));
+
+  // Метка текущего положения
+  maps.active.geoObjects.add(new ymaps.Placemark(
+    [55.7512, 37.5947],
+    { hintContent: 'Дом Пушкина на Арбате' },
+    {
+      iconLayout: makeMarkerIcon('#E8845C'),
+      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
+    }
+  ));
+
+  // Метка финиша
+  maps.active.geoObjects.add(new ymaps.Placemark(
+    ARBAT_ROUTE[ARBAT_ROUTE.length - 1],
+    { hintContent: 'Финиш: Арбатские ворота' },
+    {
+      iconLayout: makeMarkerIcon('#7ECBBD'),
+      iconShape: { type: 'Circle', coordinates: [0, 0], radius: 10 }
+    }
+  ));
+}
+
+ymaps.ready(function() {
+  // Если пользователь уже на экране home — инициализируем сразу
+  if (document.getElementById('screen-home').classList.contains('active')) {
+    initHomeMap();
+  }
+});
 </script>
 </body>
 </html>
