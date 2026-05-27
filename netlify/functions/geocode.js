@@ -1,7 +1,7 @@
 const https = require('https');
 
 // Публичный ключ — он же используется в HTML, не секрет
-const MAPS_KEY = '6a51cb53-ed6a-4d80-b294-bc082028e4ac';
+const MAPS_KEY = 'e221b30c-502f-43db-9bcd-5fb61ec12839';
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors() };
