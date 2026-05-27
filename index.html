@@ -447,28 +447,20 @@ function schedSug(i, val) {
   sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
 }
 
-/* Use ymaps.geocode — already loaded, works in Russia, no CORS issues */
+/* ymaps.suggest — специально для автодополнения по частичному тексту.
+   При выборе делаем отдельный geocode чтобы получить координаты. */
 async function fetchSug(i, val) {
-  if (typeof ymaps === 'undefined' || !ymaps.geocode) return;
+  if (typeof ymaps === 'undefined' || !ymaps.suggest) return;
   try {
-    const result = await ymaps.geocode(val, { results: 6 });
-    const objs = result.geoObjects.toArray();
-    if (!objs.length) { closeSug(i); return; }
-    const items = objs
-      .filter(o => o.geometry && o.geometry.getCoordinates())
-      .map(o => {
-        const coords = o.geometry.getCoordinates();
-        return {
-          name: o.properties.get('name') || o.properties.get('text') || val,
-          full: o.properties.get('text') || '',
-          lat:  coords[0],
-          lng:  coords[1]
-        };
-      })
-      .filter(it => it.lat && it.lng);
+    const results = await ymaps.suggest(val, { results: 6 });
+    if (!results.length) { closeSug(i); return; }
+    const items = results.map(r => ({
+      name: r.displayName || r.value,
+      full: r.value
+    }));
     renderSug(i, items);
   } catch (e) {
-    console.error('geocode err', e);
+    console.error('suggest err', e);
     closeSug(i);
   }
 }
@@ -488,12 +480,21 @@ function renderSug(i, items) {
       </div>`;
     /* pointerdown + preventDefault keeps input focused on mobile (prevents blur) */
     div.addEventListener('pointerdown', e => e.preventDefault());
-    div.addEventListener('click', () => {
-      const pt = { lat: item.lat, lng: item.lng, text: item.name };
-      if (i === 0) { fromPt = pt; inps[0].value = item.name; }
-      else         { toPt   = pt; inps[1].value = item.name; }
-      markConfirmed(i);
+    div.addEventListener('click', async () => {
+      /* Сначала показываем текст, потом геокодируем для координат */
+      inps[i].value = item.name;
       closeSug(i);
+      try {
+        const geo = await ymaps.geocode(item.full, { results: 1 });
+        const obj = geo.geoObjects.get(0);
+        if (obj && obj.geometry) {
+          const coords = obj.geometry.getCoordinates();
+          const pt = { lat: coords[0], lng: coords[1], text: item.name };
+          if (i === 0) { fromPt = pt; inps[0].value = item.name; }
+          else         { toPt   = pt; inps[1].value = item.name; }
+        }
+      } catch (e) { console.error('geocode on select err', e); }
+      markConfirmed(i);
       updateBtn();
     });
     box.appendChild(div);
