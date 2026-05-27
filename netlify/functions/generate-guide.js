@@ -56,12 +56,16 @@ exports.handler = async (event) => {
       res.on('data', c => data += c);
       res.on('end', () => {
         try {
+          console.log('YandexGPT raw response:', data.slice(0, 500));
           const parsed = JSON.parse(data);
           const text = parsed.result?.alternatives?.[0]?.message?.text || '';
+          if (!text) {
+            console.error('YandexGPT empty text, full response:', JSON.stringify(parsed));
+          }
           resolve({
             statusCode: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ text, _debug: text ? undefined : parsed })
           });
         } catch (e) {
           resolve({
