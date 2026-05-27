@@ -305,7 +305,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
 <button id="fab-locate" title="Моё местоположение">⊙</button>
 
-<script src="https://api-maps.yandex.ru/2.1/?apikey=0c631859-d2f0-4bd1-8315-384a18c83a8d&lang=ru_RU&load=package.full" type="text/javascript"></script>
+<script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
 'use strict';
 
@@ -447,18 +447,15 @@ function schedSug(i, val) {
   sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
 }
 
-/* ymaps.suggest — специально для автодополнения по частичному тексту.
-   При выборе делаем отдельный geocode чтобы получить координаты. */
+/* Запрашиваем подсказки через Netlify-функцию /api/geocode.
+   Геокодер-ключ работает на сервере Netlify без ограничений по домену. */
 async function fetchSug(i, val) {
-  if (typeof ymaps === 'undefined' || !ymaps.suggest) return;
   try {
-    const results = await ymaps.suggest(val, { results: 6 });
-    if (!results.length) { closeSug(i); return; }
-    const items = results.map(r => ({
-      name: r.displayName || r.value,
-      full: r.value
-    }));
-    renderSug(i, items);
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(val)}`);
+    if (!res.ok) { closeSug(i); return; }
+    const items = await res.json();
+    if (!items.length) { closeSug(i); return; }
+    renderSug(i, items.map(r => ({ name: r.text, full: r.text, lat: r.lat, lng: r.lng })));
   } catch (e) {
     console.error('suggest err', e);
     closeSug(i);
@@ -472,29 +469,18 @@ function renderSug(i, items) {
   items.forEach(item => {
     const div = document.createElement('div');
     div.className = 'sug-item';
-    const showSub = item.full && item.full !== item.name;
     div.innerHTML = `<span class="sug-ico">📍</span>
       <div>
         <div class="sug-name">${esc(item.name)}</div>
-        ${showSub ? `<div class="sug-sub">${esc(item.full)}</div>` : ''}
       </div>`;
     /* pointerdown + preventDefault keeps input focused on mobile (prevents blur) */
     div.addEventListener('pointerdown', e => e.preventDefault());
-    div.addEventListener('click', async () => {
-      /* Сначала показываем текст, потом геокодируем для координат */
-      inps[i].value = item.name;
-      closeSug(i);
-      try {
-        const geo = await ymaps.geocode(item.full, { results: 1 });
-        const obj = geo.geoObjects.get(0);
-        if (obj && obj.geometry) {
-          const coords = obj.geometry.getCoordinates();
-          const pt = { lat: coords[0], lng: coords[1], text: item.name };
-          if (i === 0) { fromPt = pt; inps[0].value = item.name; }
-          else         { toPt   = pt; inps[1].value = item.name; }
-        }
-      } catch (e) { console.error('geocode on select err', e); }
+    div.addEventListener('click', () => {
+      const pt = { lat: item.lat, lng: item.lng, text: item.name };
+      if (i === 0) { fromPt = pt; inps[0].value = item.name; }
+      else         { toPt   = pt; inps[1].value = item.name; }
       markConfirmed(i);
+      closeSug(i);
       updateBtn();
     });
     box.appendChild(div);
