@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
     outputAudioSpec: { containerAudio: { containerAudioType: 'MP3' } },
     hints: [
       { voice },
-      { role: 'good' },
+      ...(voice === 'alena' ? [{ role: 'good' }] : []),
       { speed: parseFloat(speed) }
     ],
     folderId: FOLDER_ID
