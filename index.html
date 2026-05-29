@@ -320,7 +320,6 @@ let toPt   = null;
 
 let routeCoords  = [];
 let routeLine    = null;
-let routeLineDone = null;
 let routeMarkers = [];
 
 let segments  = [];
@@ -567,8 +566,7 @@ function drawRoute(coords, pts) {
 }
 
 function clearRoute() {
-  if (routeLine)     { ymap.geoObjects.remove(routeLine);     routeLine     = null; }
-  if (routeLineDone) { ymap.geoObjects.remove(routeLineDone); routeLineDone = null; }
+  if (routeLine) { ymap.geoObjects.remove(routeLine); routeLine = null; }
   routeMarkers.forEach(m => ymap.geoObjects.remove(m));
   routeMarkers = [];
 }
@@ -637,7 +635,7 @@ async function synthesizeSeg(idx) {
     const r = await fetch('/api/synthesize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: segments[idx], voice: 'alena', speed: '0.9' }),
+      body: JSON.stringify({ text: segments[idx], voice: 'ermil', speed: '0.88' }),
       signal: AbortSignal.timeout(20000)
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -655,11 +653,7 @@ async function playSegment(idx) {
   if (!blob) { browserTTS(segments[idx]); setStatus(''); return; }
   const url = URL.createObjectURL(blob);
   audio = new Audio(url);
-  audio.onended = () => {
-    URL.revokeObjectURL(url);
-    setStatus('');
-    if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
-  };
+  audio.onended = () => { URL.revokeObjectURL(url); setStatus(''); };
   audio.play().catch(() => browserTTS(segments[idx]));
   setStatus('');
 }
@@ -668,9 +662,6 @@ function browserTTS(text) {
   if (!window.speechSynthesis) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ru-RU';
-  u.onend = () => {
-    if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
-  };
   speechSynthesis.speak(u);
 }
 
@@ -685,8 +676,6 @@ function startNav() {
   btnPause.style.display = 'flex';
   btnStop.style.display  = 'flex';
   setStatus('Навигация активна', 'info');
-  if (myPos) ymap.setCenter([myPos.lat, myPos.lng], 17, { duration: 400 });
-  else ymap.setZoom(17, { duration: 400 });
   playSegment(0);
 }
 function togglePause() {
@@ -700,7 +689,6 @@ function stopNav() {
   navActive = false; navPaused = false;
   if (audio) { audio.pause(); audio = null; }
   window.speechSynthesis?.cancel();
-  if (routeLineDone) { ymap.geoObjects.remove(routeLineDone); routeLineDone = null; }
   btnNavStart.style.display = '';
   btnPause.style.display = 'none';
   btnStop.style.display  = 'none';
@@ -717,47 +705,12 @@ function haversine(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 
-function closestRouteIdx(pos) {
-  let best = 0, bestDist = Infinity;
-  routeCoords.forEach((coord, i) => {
-    const d = haversine([pos.lat, pos.lng], coord);
-    if (d < bestDist) { bestDist = d; best = i; }
-  });
-  return best;
-}
-
-function updateRouteSplit(pos) {
-  if (!routeCoords.length) return;
-  const idx = closestRouteIdx(pos);
-  if (routeLineDone) { ymap.geoObjects.remove(routeLineDone); routeLineDone = null; }
-  if (idx > 0) {
-    routeLineDone = new ymaps.GeoObject(
-      { geometry: { type: 'LineString', coordinates: routeCoords.slice(0, idx + 1) } },
-      { geodesic: false, strokeWidth: 5, strokeColor: '#475569', strokeOpacity: 0.6 }
-    );
-    ymap.geoObjects.add(routeLineDone);
-  }
-}
-
 function onNavPosition(pos) {
   if (!navActive || navPaused || !segCoords.length) return;
   const me = [pos.lat, pos.lng];
-
-  /* карта следит за пользователем */
-  ymap.setCenter(me, ymap.getZoom(), { duration: 300 });
-
-  /* затемняем пройденный путь */
-  updateRouteSplit(pos);
-
-  /* проверяем приближение к следующему сегменту */
-  let triggered = false;
   segCoords.forEach((coord, i) => {
     if (i <= currentSeg) return;
-    const dist = haversine(me, coord);
-    if (dist < 40) { playSegment(i); triggered = true; }
-    else if (i === currentSeg + 1 && !triggered) {
-      setStatus(`До следующего фрагмента: ${Math.round(dist)} м`, 'info');
-    }
+    if (haversine(me, coord) < 80) playSegment(i);
   });
 }
 
