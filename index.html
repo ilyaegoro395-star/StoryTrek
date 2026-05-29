@@ -686,6 +686,7 @@ function startNav() {
   btnStop.style.display  = 'flex';
   setStatus('Навигация активна', 'info');
   if (myPos) ymap.setCenter([myPos.lat, myPos.lng], 17, { duration: 400 });
+  else ymap.setZoom(17, { duration: 400 });
   playSegment(0);
 }
 function togglePause() {
