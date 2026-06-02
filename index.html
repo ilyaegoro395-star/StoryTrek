@@ -637,11 +637,18 @@ async function synthesizeSeg(idx) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: segments[idx], voice: 'ermil', speed: '0.88' }),
-      signal: AbortSignal.timeout(20000)
+      signal: AbortSignal.timeout(30000)
     });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) {
+      const err = await r.text().catch(() => r.status);
+      throw new Error(`HTTP ${r.status}: ${String(err).slice(0, 100)}`);
+    }
     return await r.blob();
-  } catch { return null; }
+  } catch (e) {
+    console.error('synthesize error:', e.message);
+    setStatus('Ошибка синтеза: ' + e.message.slice(0, 80), 'err');
+    return null;
+  }
 }
 
 async function playSegment(idx) {
@@ -654,7 +661,7 @@ async function playSegment(idx) {
   setStatus('Загружаем аудио…', 'info');
   const blob = await synthesizeSeg(idx);
   if (gen !== playGen) return;
-  if (!blob) { browserTTS(segments[idx]); setStatus(''); return; }
+  if (!blob) { browserTTS(segments[idx]); return; }
   const url = URL.createObjectURL(blob);
   audio = new Audio(url);
   audio.onended = () => {
@@ -662,7 +669,7 @@ async function playSegment(idx) {
     setStatus('');
     if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
   };
-  audio.play().catch(() => browserTTS(segments[idx]));
+  audio.play().catch(e => { console.error('play error:', e); browserTTS(segments[idx]); });
   setStatus('');
 }
 
