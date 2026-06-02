@@ -1,16 +1,16 @@
 const https = require('https');
 
-// SpeechKit v3 practical limit — stay well below to avoid errors
-const MAX_CHARS = 700;
+// SpeechKit v1: documented 5000-byte limit per request
+// Russian char = 2 UTF-8 bytes → safe limit is ~2000 chars
+const MAX_CHARS = 1500;
 
 function splitToChunks(text) {
   if (text.length <= MAX_CHARS) return [text];
 
   const chunks = [];
-  // First try splitting on sentence endings
   const sentences = text.split(/(?<=[.!?…])\s+/);
-
   let current = '';
+
   for (const s of sentences) {
     const candidate = current ? current + ' ' + s : s;
     if (candidate.length > MAX_CHARS && current) {
@@ -22,7 +22,7 @@ function splitToChunks(text) {
   }
   if (current.trim()) chunks.push(current.trim());
 
-  // Hard fallback: if any chunk is still too long, split by chars
+  // Hard fallback: slice any chunk still over the limit
   const safe = [];
   for (const chunk of chunks) {
     if (chunk.length <= MAX_CHARS) {
@@ -36,22 +36,25 @@ function splitToChunks(text) {
   return safe.length ? safe : [text.slice(0, MAX_CHARS)];
 }
 
-function synthesizeChunk(text, hints, apiKey, folderId) {
+function synthesizeChunk(text, voice, speed, apiKey, folderId) {
   return new Promise((resolve) => {
-    const body = JSON.stringify({
+    const params = new URLSearchParams({
       text,
-      outputAudioSpec: { containerAudio: { containerAudioType: 'MP3' } },
-      hints,
+      lang:     'ru-RU',
+      voice,
+      format:   'mp3',
+      speed:    String(speed),
       folderId
     });
+    const body = params.toString();
 
     const options = {
       hostname: 'tts.api.cloud.yandex.net',
-      path: '/tts/v3/utteranceSynthesis',
-      method: 'POST',
-      headers: {
+      path:     '/speech/v1/tts:synthesize',
+      method:   'POST',
+      headers:  {
         'Authorization': `Api-Key ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type':  'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(body)
       }
     };
@@ -60,23 +63,13 @@ function synthesizeChunk(text, hints, apiKey, folderId) {
       const chunks = [];
       r.on('data', c => chunks.push(c));
       r.on('end', () => {
-        const raw = Buffer.concat(chunks).toString();
         if (r.statusCode !== 200) {
-          console.error('SpeechKit error:', r.statusCode, raw.slice(0, 300));
+          const raw = Buffer.concat(chunks).toString();
+          console.error('SpeechKit v1 error:', r.statusCode, raw.slice(0, 300));
           resolve({ error: `${r.statusCode}: ${raw.slice(0, 200)}` });
           return;
         }
-        const audioParts = [];
-        for (const line of raw.split('\n')) {
-          const t = line.trim();
-          if (!t) continue;
-          try {
-            const obj = JSON.parse(t);
-            const data = obj.result && obj.result.audioChunk && obj.result.audioChunk.data;
-            if (data) audioParts.push(Buffer.from(data, 'base64'));
-          } catch { }
-        }
-        resolve({ audio: audioParts });
+        resolve({ audio: Buffer.concat(chunks) });
       });
     });
 
@@ -98,24 +91,17 @@ module.exports = async (req, res) => {
   const API_KEY   = process.env.YANDEX_SPEECHKIT_KEY;
   const FOLDER_ID = process.env.YANDEX_FOLDER_ID;
 
-  const roleByVoice = { alena: 'good', zahar: 'good', ermil: 'good',
-                        jane: 'good', masha: 'good', marina: 'friendly' };
-  const role = roleByVoice[voice];
-  const hints = [
-    { voice },
-    ...(role ? [{ role }] : []),
-    { speed: parseFloat(speed) }
-  ];
-
   const textChunks = splitToChunks(text);
-  console.log(`Synthesizing ${textChunks.length} chunks, text length: ${text.length}`);
+  console.log(`TTS v1: ${textChunks.length} chunks, total ${text.length} chars`);
 
-  const results = await Promise.all(textChunks.map(chunk => synthesizeChunk(chunk, hints, API_KEY, FOLDER_ID)));
+  const results = await Promise.all(
+    textChunks.map(chunk => synthesizeChunk(chunk, voice, speed, API_KEY, FOLDER_ID))
+  );
 
   const allAudio = [];
   for (const r of results) {
     if (r.error) { res.status(400).json({ error: r.error }); return; }
-    allAudio.push(...r.audio);
+    allAudio.push(r.audio);
   }
 
   if (!allAudio.length) { res.status(500).json({ error: 'No audio data' }); return; }
