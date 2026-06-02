@@ -636,7 +636,7 @@ async function synthesizeSeg(idx) {
     const r = await fetch('/api/synthesize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: segments[idx], voice: 'ermil', speed: '0.88' }),
+      body: JSON.stringify({ text: segments[idx], voice: 'alena', speed: '0.88' }),
       signal: AbortSignal.timeout(30000)
     });
     if (!r.ok) {
@@ -646,7 +646,7 @@ async function synthesizeSeg(idx) {
     return await r.blob();
   } catch (e) {
     console.error('synthesize error:', e.message);
-    setStatus('Ошибка синтеза: ' + e.message.slice(0, 80), 'err');
+    setStatus('Ошибка синтеза: ' + e.message.slice(0, 200), 'err');
     return null;
   }
 }

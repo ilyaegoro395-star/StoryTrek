@@ -6,7 +6,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST')    { res.status(405).end(); return; }
 
-  const { text, voice = 'ermil', speed = '0.88' } = req.body || {};
+  const { text, voice = 'alena', speed = '0.88' } = req.body || {};
   if (!text) { res.status(400).json({ error: 'text required' }); return; }
 
   const API_KEY   = process.env.YANDEX_SPEECHKIT_KEY;
