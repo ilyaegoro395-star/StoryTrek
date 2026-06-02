@@ -326,6 +326,7 @@ let segments  = [];
 let segCoords = [];
 let currentSeg = -1;
 let audio = null;
+let playGen = 0;
 let navActive = false;
 let navPaused = false;
 
@@ -644,16 +645,23 @@ async function synthesizeSeg(idx) {
 }
 
 async function playSegment(idx) {
+  const gen = ++playGen;
   if (audio) { audio.pause(); audio = null; }
+  window.speechSynthesis?.cancel();
   if (idx < 0 || idx >= segments.length) return;
   document.querySelectorAll('.seg').forEach((el, i) => el.classList.toggle('active', i === idx));
   currentSeg = idx;
   setStatus('Загружаем аудио…', 'info');
   const blob = await synthesizeSeg(idx);
+  if (gen !== playGen) return;
   if (!blob) { browserTTS(segments[idx]); setStatus(''); return; }
   const url = URL.createObjectURL(blob);
   audio = new Audio(url);
-  audio.onended = () => { URL.revokeObjectURL(url); setStatus(''); };
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+    setStatus('');
+    if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
+  };
   audio.play().catch(() => browserTTS(segments[idx]));
   setStatus('');
 }
