@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/generate-guide.js": { "maxDuration": 60 },
+    "api/synthesize.js":     { "maxDuration": 30 },
+    "api/geocode.js":        { "maxDuration": 15 }
+  }
+}
