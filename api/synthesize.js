@@ -1,25 +1,39 @@
 const https = require('https');
 
-// SpeechKit v3 limit is ~4000 UTF-8 bytes; Russian chars = 2 bytes each → ~2000 chars safe limit
-const MAX_BYTES = 3800;
+// SpeechKit v3 practical limit — stay well below to avoid errors
+const MAX_CHARS = 700;
 
 function splitToChunks(text) {
-  if (Buffer.byteLength(text, 'utf8') <= MAX_BYTES) return [text];
-  // Split on sentence boundaries
-  const parts = text.split(/(?<=[.!?…])\s+/);
+  if (text.length <= MAX_CHARS) return [text];
+
   const chunks = [];
+  // First try splitting on sentence endings
+  const sentences = text.split(/(?<=[.!?…])\s+/);
+
   let current = '';
-  for (const part of parts) {
-    const candidate = current ? current + ' ' + part : part;
-    if (Buffer.byteLength(candidate, 'utf8') > MAX_BYTES && current) {
+  for (const s of sentences) {
+    const candidate = current ? current + ' ' + s : s;
+    if (candidate.length > MAX_CHARS && current) {
       chunks.push(current.trim());
-      current = part;
+      current = s;
     } else {
       current = candidate;
     }
   }
   if (current.trim()) chunks.push(current.trim());
-  return chunks.length ? chunks : [text.slice(0, 1800)];
+
+  // Hard fallback: if any chunk is still too long, split by chars
+  const safe = [];
+  for (const chunk of chunks) {
+    if (chunk.length <= MAX_CHARS) {
+      safe.push(chunk);
+    } else {
+      for (let i = 0; i < chunk.length; i += MAX_CHARS) {
+        safe.push(chunk.slice(i, i + MAX_CHARS));
+      }
+    }
+  }
+  return safe.length ? safe : [text.slice(0, MAX_CHARS)];
 }
 
 function synthesizeChunk(text, hints, apiKey, folderId) {
@@ -94,6 +108,8 @@ module.exports = async (req, res) => {
   ];
 
   const textChunks = splitToChunks(text);
+  console.log(`Synthesizing ${textChunks.length} chunks, text length: ${text.length}`);
+
   const results = await Promise.all(textChunks.map(chunk => synthesizeChunk(chunk, hints, API_KEY, FOLDER_ID)));
 
   const allAudio = [];

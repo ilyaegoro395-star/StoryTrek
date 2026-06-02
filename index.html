@@ -598,7 +598,21 @@ async function generateGuide() {
     });
     const data = await r.json();
     if (!data.text) throw new Error(data.error || 'No text');
-    segments = data.text.split('\n\n').map(s => s.trim()).filter(Boolean);
+    // Split on any paragraph break; further split long segments by sentence
+    const rawSegs = data.text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+    segments = rawSegs.flatMap(seg => {
+      if (seg.length <= 1200) return [seg];
+      // Segment too long — split on sentence boundaries
+      return seg.split(/(?<=[.!?…])\s+/).reduce((acc, s) => {
+        const last = acc[acc.length - 1] || '';
+        if ((last + ' ' + s).length <= 1200) {
+          acc[acc.length - 1] = (last ? last + ' ' : '') + s;
+        } else {
+          acc.push(s);
+        }
+        return acc;
+      }, ['']);
+    }).map(s => s.trim()).filter(Boolean);
     assignSegs();
     renderGuide();
     navBar.classList.add('visible');
