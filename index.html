@@ -94,6 +94,45 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 }
 .btn-loc:hover { background: #263347; }
 
+/* ── waypoint list ── */
+#waypoint-list { display: flex; flex-direction: column; gap: 2px; }
+.wp-row { display: flex; flex-direction: column; }
+.wp-item { display: flex; align-items: center; gap: 5px; padding: 1px 0; }
+.wp-item.dragging { opacity: 0.35; }
+.drag-handle {
+  width: 18px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #374151; font-size: 16px; cursor: grab; flex-shrink: 0;
+  user-select: none; touch-action: none;
+}
+.drag-handle:hover { color: #7ECBBD; }
+.wp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.wp-remove {
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  background: none; border: 1px solid #2a3a50; color: #374151;
+  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.wp-remove:hover { background: #2d1a1a; border-color: #4a2a2a; color: #f87171; }
+#btn-add-wp {
+  width: 100%; padding: 7px;
+  background: none; border: 1.5px dashed #2a3a50; color: #4a5568;
+  font-size: 13px; border-radius: 10px; cursor: pointer; margin-top: 2px;
+}
+#btn-add-wp:hover { border-color: #7ECBBD; color: #7ECBBD; }
+.btn-map-pick {
+  width: 26px; height: 36px; border-radius: 8px; flex-shrink: 0;
+  background: #1a2535; border: 1.5px solid #2a3a50; color: #7ECBBD;
+  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.btn-map-pick:hover { background: #263347; }
+.btn-map-pick.active { border-color: #7ECBBD; background: #172a40; }
+#map-pick-hint {
+  position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%);
+  background: rgba(14,26,46,0.96); color: #7ECBBD; border: 1px solid #2a4a6a;
+  padding: 9px 16px; border-radius: 12px; font-size: 13px; font-weight: 600;
+  z-index: 30; display: none; pointer-events: none; white-space: nowrap;
+}
+#map-pick-hint.visible { display: block; }
+
 /* ── suggestions dropdown ── */
 .sug-box {
   border-radius: 10px;
@@ -261,20 +300,8 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
   <div class="card-body">
 
-    <!-- from -->
-    <div class="input-wrap">
-      <span class="dot dot-from"></span>
-      <input id="inp-from" class="addr-input" type="text" placeholder="Откуда" autocomplete="off" spellcheck="false">
-      <button class="btn-loc" id="btn-my-loc" title="Моё место">⊙</button>
-    </div>
-    <div id="sug-from" class="sug-box"></div>
-
-    <!-- to -->
-    <div class="input-wrap">
-      <span class="dot dot-to"></span>
-      <input id="inp-to" class="addr-input" type="text" placeholder="Куда" autocomplete="off" spellcheck="false">
-    </div>
-    <div id="sug-to" class="sug-box"></div>
+    <div id="waypoint-list"></div>
+    <button id="btn-add-wp">+ Промежуточная точка</button>
 
     <button id="btn-route" disabled>Построить маршрут</button>
 
@@ -304,6 +331,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 </div>
 
 <button id="fab-locate" title="Моё местоположение">⊙</button>
+<div id="map-pick-hint">📍 Нажмите на карту чтобы выбрать точку</div>
 
 <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
@@ -315,8 +343,7 @@ let myMarker = null;
 let myPos    = null;
 let posWatch = null;
 
-let fromPt = null;  // {lat, lng, text}
-let toPt   = null;
+let waypoints = [null, null];  // array of {lat, lng, text} or null
 
 let routeCoords  = [];
 let routeLine    = null;
@@ -330,12 +357,12 @@ let playGen = 0;
 let navActive = false;
 let navPaused = false;
 
-let sugTimers  = [null, null];
+let sugTimers  = [];
 let activeSug  = -1;
+let mapPickIdx = -1;
+let drag       = null;
 
 /* ─── DOM ─── */
-const inps  = [document.getElementById('inp-from'), document.getElementById('inp-to')];
-const subs  = [document.getElementById('sug-from'), document.getElementById('sug-to')];
 const btnRoute    = document.getElementById('btn-route');
 const routeStrip  = document.getElementById('route-strip');
 const rsDist      = document.getElementById('rs-dist');
@@ -358,6 +385,28 @@ ymaps.ready(() => {
   }, { suppressMapOpenError: true });
   ymap.controls.get('zoomControl').options.set({ position: { right: 14, top: 80 } });
   startPosWatch();
+  renderWaypointList();
+
+  ymap.events.add('click', async e => {
+    if (mapPickIdx < 0) return;
+    const [lat, lng] = e.get('coords');
+    const idx = mapPickIdx;
+    cancelMapPick();
+    setStatus('Определяем адрес…', 'info');
+    try {
+      const result = await ymaps.geocode([lat, lng], { results: 1 });
+      const obj = result.geoObjects.get(0);
+      const text = obj
+        ? (obj.properties.get('text') || obj.getAddressLine())
+        : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      waypoints[idx] = { lat, lng, text };
+    } catch {
+      waypoints[idx] = { lat, lng, text: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+    }
+    renderWaypointList();
+    updateBtn();
+    setStatus('');
+  });
 });
 
 /* ─── geolocation ─── */
@@ -396,26 +445,23 @@ document.getElementById('fab-locate').addEventListener('click', () => {
   );
 });
 
-document.getElementById('btn-my-loc').addEventListener('click', useMyLoc);
 async function useMyLoc() {
   if (!navigator.geolocation) return;
   setStatus('Определяем местоположение…', 'info');
   navigator.geolocation.getCurrentPosition(async pos => {
     const { latitude: lat, longitude: lng } = pos.coords;
-    fromPt = { lat, lng, text: 'Моё местоположение' };
-    inps[0].value = fromPt.text;
+    waypoints[0] = { lat, lng, text: 'Моё местоположение' };
     try {
-      /* reverse geocode with ymaps — no external service needed */
       const result = await ymaps.geocode([lat, lng], { results: 1 });
       const obj = result.geoObjects.get(0);
       if (obj) {
         const label = obj.properties.get('text') || obj.getAddressLine();
-        if (label) { fromPt.text = label; inps[0].value = label; }
+        if (label) waypoints[0].text = label;
       }
-    } catch { /* keep "Моё местоположение" */ }
-    markConfirmed(0);
-    setStatus('');
+    } catch { }
+    renderWaypointList();
     updateBtn();
+    setStatus('');
   }, () => setStatus('Нет доступа к геолокации', 'err'));
 }
 
@@ -426,37 +472,179 @@ document.getElementById('btn-collapse').addEventListener('click', () => {
   document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '—';
 });
 
-/* ─── suggestions ─── */
-inps.forEach((inp, i) => {
-  inp.addEventListener('input', e => {
-    inp.classList.remove('confirmed');
-    if (i === 0) fromPt = null; else toPt = null;
-    updateBtn();
-    schedSug(i, e.target.value.trim());
-  });
-  inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
-  inp.addEventListener('focus', () => {
-    card.classList.remove('collapsed');
-    document.getElementById('btn-collapse').textContent = '—';
-    if (inp.value.trim().length >= 2) schedSug(i, inp.value.trim());
-  });
-});
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
-function schedSug(i, val) {
-  clearTimeout(sugTimers[i]);
-  if (val.length < 2) { closeSug(i); return; }
-  sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
+/* ─── waypoint rendering ─── */
+function wpDotColor(i, n) {
+  if (i === 0) return '#7ECBBD';
+  if (i === n - 1) return '#f87171';
+  return '#94a3b8';
 }
 
-/* Запрашиваем подсказки через Netlify-функцию /api/geocode.
-   Геокодер-ключ работает на сервере Netlify без ограничений по домену. */
+function renderWaypointList() {
+  const list = document.getElementById('waypoint-list');
+  if (!list) return;
+  list.innerHTML = '';
+  waypoints.forEach((wp, i) => {
+    const row = document.createElement('div');
+    row.className = 'wp-row';
+    const ph = i === 0 ? 'Откуда' : i === waypoints.length - 1 ? 'Куда' : 'Промежуточная точка';
+    row.innerHTML = `
+      <div class="wp-item" data-idx="${i}">
+        <span class="drag-handle" data-idx="${i}">⠿</span>
+        <span class="wp-dot" style="background:${wpDotColor(i, waypoints.length)}"></span>
+        <input class="addr-input wp-inp" type="text" placeholder="${ph}"
+          autocomplete="off" spellcheck="false" data-idx="${i}"
+          value="${wp ? esc(wp.text) : ''}">
+        ${i === 0 ? '<button class="btn-loc" id="btn-my-loc" title="Моё место">⊙</button>' : ''}
+        <button class="btn-map-pick" data-idx="${i}" title="Выбрать на карте">📍</button>
+        ${waypoints.length > 2 ? `<button class="wp-remove" data-idx="${i}">✕</button>` : ''}
+      </div>
+      <div class="sug-box wp-sug" data-idx="${i}"></div>`;
+    if (wp) row.querySelector('.wp-inp').classList.add('confirmed');
+    list.appendChild(row);
+  });
+  bindWaypointEvents();
+}
+
+function bindWaypointEvents() {
+  document.querySelectorAll('.wp-inp').forEach(inp => {
+    const i = parseInt(inp.dataset.idx);
+    inp.addEventListener('input', e => {
+      inp.classList.remove('confirmed');
+      waypoints[i] = null;
+      updateBtn();
+      const val = e.target.value.trim();
+      clearTimeout(sugTimers[i]);
+      if (val.length < 2) { closeSug(i); return; }
+      sugTimers[i] = setTimeout(() => fetchSug(i, val), 350);
+    });
+    inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
+    inp.addEventListener('focus', () => {
+      card.classList.remove('collapsed');
+      document.getElementById('btn-collapse').textContent = '—';
+      if (inp.value.trim().length >= 2) {
+        clearTimeout(sugTimers[i]);
+        sugTimers[i] = setTimeout(() => fetchSug(i, inp.value.trim()), 350);
+      }
+    });
+  });
+
+  const myLocBtn = document.getElementById('btn-my-loc');
+  if (myLocBtn) myLocBtn.addEventListener('click', useMyLoc);
+
+  document.querySelectorAll('.btn-map-pick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.idx);
+      if (mapPickIdx === i) { cancelMapPick(); return; }
+      activateMapPick(i);
+    });
+  });
+
+  document.querySelectorAll('.wp-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.idx);
+      waypoints.splice(i, 1);
+      sugTimers.splice(i, 1);
+      renderWaypointList();
+      updateBtn();
+    });
+  });
+
+  /* desktop drag & drop */
+  document.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.setAttribute('draggable', 'true');
+    handle.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', handle.dataset.idx);
+      setTimeout(() => handle.closest('.wp-item').classList.add('dragging'), 0);
+    });
+    handle.addEventListener('dragend', () =>
+      document.querySelectorAll('.wp-item').forEach(el => el.classList.remove('dragging', 'drag-over')));
+    /* touch drag start */
+    handle.addEventListener('touchstart', e => {
+      const i = parseInt(handle.dataset.idx);
+      drag = { idx: i, startY: e.touches[0].clientY };
+      handle.closest('.wp-item').classList.add('dragging');
+    }, { passive: true });
+  });
+
+  document.querySelectorAll('.wp-row').forEach(row => {
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      document.querySelectorAll('.wp-item').forEach(el => el.classList.remove('drag-over'));
+      row.querySelector('.wp-item').classList.add('drag-over');
+    });
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      const src = parseInt(e.dataTransfer.getData('text/plain'));
+      const dst = parseInt(row.querySelector('.wp-item').dataset.idx);
+      if (src !== dst) {
+        const [wp] = waypoints.splice(src, 1);
+        waypoints.splice(dst, 0, wp);
+        renderWaypointList(); updateBtn();
+      }
+      document.querySelectorAll('.wp-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+    });
+  });
+}
+
+/* touch drag move/end — listen on document so it works outside the handle */
+document.addEventListener('touchmove', e => {
+  if (!drag) return;
+  const y = e.touches[0].clientY;
+  const rows = [...document.querySelectorAll('.wp-row')];
+  for (let i = 0; i < rows.length; i++) {
+    if (i === drag.idx) continue;
+    const r = rows[i].querySelector('.wp-item').getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+    if ((i < drag.idx && y < mid) || (i > drag.idx && y > mid)) {
+      [waypoints[drag.idx], waypoints[i]] = [waypoints[i], waypoints[drag.idx]];
+      drag.idx = i;
+      renderWaypointList();
+      const el = document.querySelectorAll('.wp-item')[i];
+      if (el) el.classList.add('dragging');
+      break;
+    }
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  if (!drag) return;
+  document.querySelectorAll('.wp-item').forEach(el => {
+    el.classList.remove('dragging');
+    el.style.transform = '';
+  });
+  drag = null;
+  renderWaypointList(); updateBtn();
+});
+
+document.getElementById('btn-add-wp').addEventListener('click', () => {
+  waypoints.splice(waypoints.length - 1, 0, null);
+  renderWaypointList(); updateBtn();
+});
+
+/* ─── map pick mode ─── */
+function activateMapPick(idx) {
+  mapPickIdx = idx;
+  document.getElementById('map-pick-hint').classList.add('visible');
+  document.querySelectorAll('.btn-map-pick').forEach((btn, i) =>
+    btn.classList.toggle('active', parseInt(btn.dataset.idx) === idx));
+}
+function cancelMapPick() {
+  mapPickIdx = -1;
+  document.getElementById('map-pick-hint').classList.remove('visible');
+  document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
+}
+
+/* ─── suggestions ─── */
 async function fetchSug(i, val) {
   try {
-    const res = await fetch(`/api/geocode?q=${encodeURIComponent(val)}`);
+    const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(val)}${ll}`);
     if (!res.ok) { closeSug(i); return; }
     const items = await res.json();
     if (!items.length) { closeSug(i); return; }
-    renderSug(i, items.map(r => ({ name: r.text, full: r.text, lat: r.lat, lng: r.lng })));
+    renderSug(i, items);
   } catch (e) {
     console.error('suggest err', e);
     closeSug(i);
@@ -464,23 +652,18 @@ async function fetchSug(i, val) {
 }
 
 function renderSug(i, items) {
-  const box = subs[i];
-  if (!items.length) { closeSug(i); return; }
+  const box = document.querySelector(`.wp-sug[data-idx="${i}"]`);
+  if (!box || !items.length) { closeSug(i); return; }
   box.innerHTML = '';
   items.forEach(item => {
     const div = document.createElement('div');
     div.className = 'sug-item';
-    div.innerHTML = `<span class="sug-ico">📍</span>
-      <div>
-        <div class="sug-name">${esc(item.name)}</div>
-      </div>`;
-    /* pointerdown + preventDefault keeps input focused on mobile (prevents blur) */
+    div.innerHTML = `<span class="sug-ico">📍</span><div><div class="sug-name">${esc(item.text)}</div></div>`;
     div.addEventListener('pointerdown', e => e.preventDefault());
     div.addEventListener('click', () => {
-      const pt = { lat: item.lat, lng: item.lng, text: item.name };
-      if (i === 0) { fromPt = pt; inps[0].value = item.name; }
-      else         { toPt   = pt; inps[1].value = item.name; }
-      markConfirmed(i);
+      waypoints[i] = { lat: item.lat, lng: item.lng, text: item.text };
+      const inp = document.querySelector(`.wp-inp[data-idx="${i}"]`);
+      if (inp) { inp.value = item.text; inp.classList.add('confirmed'); }
       closeSug(i);
       updateBtn();
     });
@@ -491,33 +674,27 @@ function renderSug(i, items) {
 }
 
 function closeSug(i) {
-  subs[i].classList.remove('open');
-  subs[i].innerHTML = '';
+  const box = document.querySelector(`.wp-sug[data-idx="${i}"]`);
+  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
   if (activeSug === i) activeSug = -1;
 }
 
-/* green border + tinted background = address confirmed */
-function markConfirmed(i) {
-  inps[i].classList.add('confirmed');
-}
-
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
-
 /* ─── routing ─── */
 function updateBtn() {
-  btnRoute.disabled = !(fromPt && toPt);
+  const confirmed = waypoints.filter(Boolean);
+  btnRoute.disabled = confirmed.length < 2;
 }
 
 btnRoute.addEventListener('click', buildRoute);
 
 async function buildRoute() {
-  if (!fromPt || !toPt) return;
-  closeSug(0); closeSug(1);
+  const pts = waypoints.filter(Boolean);
+  if (pts.length < 2) return;
+  waypoints.forEach((_, i) => closeSug(i));
   setStatus('Строим маршрут…', 'info');
   btnRoute.disabled = true;
 
   try {
-    const pts = [fromPt, toPt];
     const cs  = pts.map(w => `${w.lng},${w.lat}`).join(';');
     const r   = await fetch(
       `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
@@ -575,12 +752,14 @@ function clearRoute() {
 btnClear.addEventListener('click', () => {
   clearRoute(); routeCoords = [];
   segments = []; segCoords = [];
+  waypoints = [null, null];
   routeStrip.classList.remove('visible');
   guideSec.classList.remove('visible');
   guideWrap.classList.remove('visible');
   navBar.classList.remove('visible');
   guideText.innerHTML = '';
   stopNav(); setStatus('');
+  renderWaypointList();
 });
 
 /* ─── guide generation ─── */
@@ -593,7 +772,9 @@ async function generateGuide() {
     const r = await fetch('/api/generate-guide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ routeDescription: `От «${fromPt.text}» до «${toPt.text}»` }),
+      body: JSON.stringify({ routeDescription: waypoints.filter(Boolean).map((p, i, a) =>
+        i === 0 ? `Начало: «${p.text}»` : i === a.length-1 ? `Конец: «${p.text}»` : `Промежуточная точка: «${p.text}»`
+      ).join('\n') }),
       signal: AbortSignal.timeout(45000)
     });
     const data = await r.json();

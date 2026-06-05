@@ -8,14 +8,16 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const q = (req.query && req.query.q) || '';
+  const q  = (req.query && req.query.q)  || '';
+  const ll = (req.query && req.query.ll) || '';
   if (q.length < 2) { res.status(200).json([]); return; }
 
   try {
+    const llParam = ll ? `&ll=${encodeURIComponent(ll)}&spn=1,1&prefer_poi=1` : '';
     const sugUrl =
       `https://suggest-maps.yandex.ru/v1/suggest` +
       `?apikey=${SUGGEST_KEY}&text=${encodeURIComponent(q)}` +
-      `&lang=ru_RU&results=8&types=geo&print_address=1`;
+      `&lang=ru_RU&results=8&types=geo&print_address=1${llParam}`;
 
     const { status, body: raw } = await fetch2(sugUrl);
     if (status === 200) {
