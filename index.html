@@ -11,21 +11,29 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 /* ── full-screen map ── */
 #map { position: fixed; inset: 0; z-index: 0; }
 
-/* ── floating search card ── */
+/* ── floating search card — bottom sheet ── */
 #card {
   position: fixed;
-  top: 12px; left: 12px;
+  bottom: 0; left: 0; right: 0;
   z-index: 20;
-  width: 340px;
-  max-height: calc(100vh - 24px);
+  max-height: 80vh;
   background: #111827;
-  border-radius: 16px;
+  border-radius: 16px 16px 0 0;
   border: 1px solid #1e2d40;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+  border-bottom: none;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.55);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
+/* bottom-sheet drag handle */
+.sheet-handle {
+  width: 40px; height: 4px;
+  background: #2a3a50; border-radius: 2px;
+  margin: 10px auto 0; flex-shrink: 0; cursor: pointer;
+}
+.sheet-handle:hover { background: #4a5568; }
 
 /* header */
 .card-head {
@@ -294,10 +302,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 #status.info { color: #7ECBBD; }
 #status.err  { color: #f87171; }
 
-/* ── locate FAB (bottom-right) ── */
+/* ── locate FAB (bottom-right, above card) ── */
 #fab-locate {
   position: fixed;
-  right: 14px; bottom: 24px;
+  right: 14px; bottom: 80px;
   z-index: 20;
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -320,10 +328,6 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .my-pos-ripple { position:absolute; left:-10px; top:-10px; width:20px; height:20px; border-radius:50%; background:rgba(58,125,230,.4); animation:pos-pulse 2s ease-out infinite; }
 .my-pos-dot    { position:absolute; left:-8px;  top:-8px;  width:16px; height:16px; border-radius:50%; background:#3a7de6; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.35); }
 
-/* ── mobile: card goes full-width at top ── */
-@media (max-width: 420px) {
-  #card { left: 0; right: 0; top: 0; width: 100%; border-radius: 0 0 16px 16px; border-top: none; }
-}
 </style>
 </head>
 <body>
@@ -332,9 +336,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
 <!-- floating search card -->
 <div id="card">
+  <div class="sheet-handle" id="sheet-handle"></div>
   <div class="card-head">
     <div class="logo">Story<span>Trek</span></div>
-    <button class="btn-collapse" id="btn-collapse" title="Свернуть">—</button>
+    <button class="btn-collapse" id="btn-collapse" title="Свернуть">▼</button>
   </div>
 
   <div class="card-body">
@@ -521,10 +526,12 @@ async function useMyLoc() {
 
 /* ─── collapse toggle ─── */
 const card = document.getElementById('card');
-document.getElementById('btn-collapse').addEventListener('click', () => {
+function toggleCard() {
   card.classList.toggle('collapsed');
-  document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '—';
-});
+  document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '▼';
+}
+document.getElementById('btn-collapse').addEventListener('click', toggleCard);
+document.getElementById('sheet-handle').addEventListener('click', toggleCard);
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
@@ -587,7 +594,7 @@ function bindWaypointEvents() {
     inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
     inp.addEventListener('focus', () => {
       card.classList.remove('collapsed');
-      document.getElementById('btn-collapse').textContent = '—';
+      document.getElementById('btn-collapse').textContent = '▼';
       if (inp.value.trim().length >= 2) {
         clearTimeout(sugTimers[i]);
         sugTimers[i] = setTimeout(() => fetchSug(i, inp.value.trim()), 350);
@@ -715,7 +722,7 @@ function cancelMapPick() {
   document.getElementById('map-crosshair').classList.remove('visible');
   document.getElementById('map-pick-panel').classList.remove('visible');
   card.classList.remove('collapsed');
-  document.getElementById('btn-collapse').textContent = '—';
+  document.getElementById('btn-collapse').textContent = '▼';
   document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
 }
 
@@ -784,6 +791,15 @@ function updateBtn() {
 
 btnRoute.addEventListener('click', buildRoute);
 
+function applyRouteStats(distM, durSec) {
+  const d = Math.round(distM);
+  const dm = Math.round(durSec / 60);
+  rsDist.textContent = d >= 1000 ? `${(d/1000).toFixed(1)} км` : `${d} м`;
+  rsDur.textContent  = dm >= 60 ? `${Math.floor(dm/60)} ч ${dm%60} мин` : `${dm} мин`;
+  const lbl = document.getElementById('rs-mode-lbl');
+  if (lbl) lbl.textContent = transportMode === 'bike' ? 'велосипед' : 'пешком';
+}
+
 async function buildRoute() {
   const pts = waypoints.filter(Boolean);
   if (pts.length < 2) return;
@@ -791,35 +807,57 @@ async function buildRoute() {
   setStatus('Строим маршрут…', 'info');
   btnRoute.disabled = true;
 
+  let built = false;
+
+  /* ── Yandex routing (primary — knows courtyards, bike paths) ── */
   try {
-    const cs  = pts.map(w => `${w.lng},${w.lat}`).join(';');
-    const r   = await fetch(
-      `https://router.project-osrm.org/route/v1/${transportMode}/${cs}?overview=full&geometries=geojson`,
-      { signal: AbortSignal.timeout(12000) }
+    const mode  = transportMode === 'bike' ? 'bicycle' : 'pedestrian';
+    const route = await ymaps.route(
+      pts.map(p => [p.lat, p.lng]),
+      { routingMode: mode, avoidTrafficJams: false, mapStateAutoApply: false }
     );
-    const d = await r.json();
-    if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+    let totalDist = 0, totalDur = 0;
+    const allCoords = [];
+    route.getPaths().each(path => {
+      totalDist += path.getLength() || 0;
+      totalDur  += path.getTime()   || 0;
+      const coords = path.geometry.getCoordinates();
+      if (coords) allCoords.push(...coords);
+    });
+    if (allCoords.length > 1) {
+      routeCoords = allCoords;
+      applyRouteStats(totalDist, totalDur);
+      drawRoute(routeCoords, pts);
+      routeStrip.classList.add('visible');
+      guideSec.classList.add('visible');
+      setStatus('');
+      built = true;
+    }
+  } catch (e) { console.warn('Yandex route failed, trying OSRM:', e.message); }
 
-    const route = d.routes[0];
-    const distM = Math.round(route.distance);
-    const durSec = Math.round(route.duration);
-    routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-    rsDist.textContent = distM >= 1000 ? `${(distM/1000).toFixed(1)} км` : `${distM} м`;
-    const dm = Math.round(durSec/60);
-    rsDur.textContent = dm >= 60 ? `${Math.floor(dm/60)} ч ${dm%60} мин` : `${dm} мин`;
-    const modeLbl = document.getElementById('rs-mode-lbl');
-    if (modeLbl) modeLbl.textContent = transportMode === 'bike' ? 'велосипед' : 'пешком';
-
-    drawRoute(routeCoords, pts);
-    routeStrip.classList.add('visible');
-    guideSec.classList.add('visible');
-    setStatus('');
-  } catch (e) {
-    setStatus('Не удалось построить маршрут: ' + e.message, 'err');
-  } finally {
-    btnRoute.disabled = false;
+  /* ── OSRM fallback ── */
+  if (!built) {
+    try {
+      const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
+      const r  = await fetch(
+        `https://router.project-osrm.org/route/v1/${transportMode}/${cs}?overview=full&geometries=geojson`,
+        { signal: AbortSignal.timeout(12000) }
+      );
+      const d = await r.json();
+      if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+      const rt = d.routes[0];
+      routeCoords = rt.geometry.coordinates.map(c => [c[1], c[0]]);
+      applyRouteStats(rt.distance, rt.duration);
+      drawRoute(routeCoords, pts);
+      routeStrip.classList.add('visible');
+      guideSec.classList.add('visible');
+      setStatus('');
+    } catch (e) {
+      setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+    }
   }
+
+  btnRoute.disabled = false;
 }
 
 function drawRoute(coords, pts) {
