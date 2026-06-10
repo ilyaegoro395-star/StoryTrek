@@ -302,11 +302,11 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 #status.info { color: #7ECBBD; }
 #status.err  { color: #f87171; }
 
-/* ── locate FAB (bottom-right, above card) ── */
+/* ── locate FAB (bottom-right, above card — JS sets bottom) ── */
 #fab-locate {
   position: fixed;
-  right: 14px; bottom: 80px;
-  z-index: 20;
+  right: 14px; bottom: 14px;
+  z-index: 25;
   width: 44px; height: 44px;
   border-radius: 50%;
   background: #111827dd;
@@ -398,8 +398,9 @@ let posWatch = null;
 
 let waypoints = [null, null];  // array of {lat, lng, text} or null
 
-let routeCoords  = [];
-let routeLine    = null;
+let routeCoords    = [];
+let routeDistance  = 0;
+let routeLine      = null;
 let routeMarkers = [];
 
 let segments  = [];
@@ -497,6 +498,11 @@ function setMyMarker(coord) {
     myMarker.geometry.setCoordinates(coord);
   }
 }
+
+/* keep FAB above card bottom sheet */
+new ResizeObserver(() => {
+  document.getElementById('fab-locate').style.bottom = (card.offsetHeight + 14) + 'px';
+}).observe(card);
 
 document.getElementById('fab-locate').addEventListener('click', () => {
   if (myPos) ymap.setCenter([myPos.lat, myPos.lng], 15, { duration: 400 });
@@ -792,7 +798,8 @@ function updateBtn() {
 btnRoute.addEventListener('click', buildRoute);
 
 function applyRouteStats(distM, durSec) {
-  const d = Math.round(distM);
+  routeDistance = Math.round(distM);
+  const d = routeDistance;
   const dm = Math.round(durSec / 60);
   rsDist.textContent = d >= 1000 ? `${(d/1000).toFixed(1)} км` : `${d} м`;
   rsDur.textContent  = dm >= 60 ? `${Math.floor(dm/60)} ч ${dm%60} мин` : `${dm} мин`;
@@ -909,9 +916,13 @@ async function generateGuide() {
     const r = await fetch('/api/generate-guide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ routeDescription: waypoints.filter(Boolean).map((p, i, a) =>
-        i === 0 ? `Начало: «${p.text}»` : i === a.length-1 ? `Конец: «${p.text}»` : `Промежуточная точка: «${p.text}»`
-      ).join('\n') }),
+      body: JSON.stringify({
+        routeDescription: waypoints.filter(Boolean).map((p, i, a) =>
+          i === 0 ? `Начало: «${p.text}»` : i === a.length-1 ? `Конец: «${p.text}»` : `Промежуточная точка: «${p.text}»`
+        ).join('\n'),
+        routeDistance,
+        transportMode
+      }),
       signal: AbortSignal.timeout(45000)
     });
     const data = await r.json();
