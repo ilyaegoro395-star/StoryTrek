@@ -499,11 +499,6 @@ function setMyMarker(coord) {
   }
 }
 
-/* keep FAB above card bottom sheet */
-new ResizeObserver(() => {
-  document.getElementById('fab-locate').style.bottom = (card.offsetHeight + 14) + 'px';
-}).observe(card);
-
 document.getElementById('fab-locate').addEventListener('click', () => {
   if (myPos) ymap.setCenter([myPos.lat, myPos.lng], 15, { duration: 400 });
   else navigator.geolocation?.getCurrentPosition(
@@ -532,6 +527,12 @@ async function useMyLoc() {
 
 /* ─── collapse toggle ─── */
 const card = document.getElementById('card');
+
+/* keep FAB above the bottom sheet — update whenever card resizes */
+new ResizeObserver(() => {
+  document.getElementById('fab-locate').style.bottom = (card.offsetHeight + 14) + 'px';
+}).observe(card);
+
 function toggleCard() {
   card.classList.toggle('collapsed');
   document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '▼';
