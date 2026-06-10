@@ -690,9 +690,10 @@ document.getElementById('btn-add-wp').addEventListener('click', () => {
 
 document.getElementById('transport-mode').addEventListener('click', e => {
   const btn = e.target.closest('.mode-btn');
-  if (!btn) return;
+  if (!btn || btn.dataset.mode === transportMode) return;
   transportMode = btn.dataset.mode;
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if (routeCoords.length > 0) buildRoute();
 });
 
 /* ─── map pick mode ─── */
