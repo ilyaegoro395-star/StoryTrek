@@ -8,6 +8,38 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
+  /* ── reverse geocoding: ?lat=…&lng=… ── */
+  const rlat = (req.query && req.query.lat) || '';
+  const rlng = (req.query && req.query.lng) || '';
+  if (rlat && rlng) {
+    try {
+      const geoUrl =
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${GEOCODER_KEY}` +
+        `&geocode=${encodeURIComponent(`${rlng},${rlat}`)}&format=json&results=1&lang=ru_RU`;
+      const { status, body: raw } = await fetch2(geoUrl);
+      if (status === 200) {
+        const data = JSON.parse(raw);
+        const members = (data.response?.GeoObjectCollection?.featureMember) || [];
+        if (members.length > 0) {
+          const text = members[0].GeoObject.metaDataProperty.GeocoderMetaData.text;
+          res.status(200).json({ text }); return;
+        }
+      }
+    } catch (e) { console.error('Reverse Yandex failed:', e.message); }
+
+    try {
+      const nomUrl =
+        `https://nominatim.openstreetmap.org/reverse` +
+        `?lat=${rlat}&lon=${rlng}&format=json&accept-language=ru`;
+      const { body: raw } = await fetch2(nomUrl, { 'User-Agent': 'StoryTrek/1.0' });
+      const data = JSON.parse(raw);
+      if (data.display_name) { res.status(200).json({ text: data.display_name }); return; }
+    } catch (e) { console.error('Reverse Nominatim failed:', e.message); }
+
+    res.status(200).json({ text: `${parseFloat(rlat).toFixed(5)}, ${parseFloat(rlng).toFixed(5)}` });
+    return;
+  }
+
   const q  = (req.query && req.query.q)  || '';
   const ll = (req.query && req.query.ll) || '';
   if (q.length < 2) { res.status(200).json([]); return; }

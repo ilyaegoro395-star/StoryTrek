@@ -450,23 +450,18 @@ ymaps.ready(() => {
 });
 
 async function geocodeCenter(lat, lng) {
+  let text = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   try {
-    const result = await ymaps.geocode([lat, lng], { results: 1 });
-    const obj = result.geoObjects.get(0);
-    const text = obj
-      ? (obj.properties.get('text') || obj.getAddressLine())
-      : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const addrEl = document.getElementById('mpp-addr');
-    if (addrEl) addrEl.textContent = text;
-    const doneBtn = document.getElementById('mpp-done');
-    if (doneBtn) { doneBtn.dataset.lat = lat; doneBtn.dataset.lng = lng; doneBtn.dataset.text = text; }
-  } catch {
-    const text = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const addrEl = document.getElementById('mpp-addr');
-    if (addrEl) addrEl.textContent = text;
-    const doneBtn = document.getElementById('mpp-done');
-    if (doneBtn) { doneBtn.dataset.lat = lat; doneBtn.dataset.lng = lng; doneBtn.dataset.text = text; }
-  }
+    const r = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+    if (r.ok) {
+      const data = await r.json();
+      if (data.text) text = data.text;
+    }
+  } catch { }
+  const addrEl = document.getElementById('mpp-addr');
+  if (addrEl) addrEl.textContent = text;
+  const doneBtn = document.getElementById('mpp-done');
+  if (doneBtn) { doneBtn.dataset.lat = lat; doneBtn.dataset.lng = lng; doneBtn.dataset.text = text; }
 }
 
 /* ─── geolocation ─── */
@@ -512,11 +507,10 @@ async function useMyLoc() {
     const { latitude: lat, longitude: lng } = pos.coords;
     waypoints[0] = { lat, lng, text: 'Моё местоположение' };
     try {
-      const result = await ymaps.geocode([lat, lng], { results: 1 });
-      const obj = result.geoObjects.get(0);
-      if (obj) {
-        const label = obj.properties.get('text') || obj.getAddressLine();
-        if (label) waypoints[0].text = label;
+      const r = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      if (r.ok) {
+        const data = await r.json();
+        if (data.text) waypoints[0].text = data.text;
       }
     } catch { }
     renderWaypointList();
