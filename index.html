@@ -29,17 +29,23 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
 }
 #card.peek, #explore-panel.peek {
-  transform: translateY(calc(100% - 36px)); /* полоска-ручка торчит над навбаром */
+  transform: translateY(calc(100% - 44px)); /* полоска-ручка торчит над навбаром */
 }
 #card.open { transform: translateY(0); }
 
-/* bottom-sheet drag handle */
+/* bottom-sheet drag handle — full-width touch target, visual bar inside */
 .sheet-handle {
+  width: 100%; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; cursor: pointer;
+  touch-action: none; /* JS handles vertical swipe */
+}
+.sheet-handle::after {
+  content: '';
   width: 40px; height: 4px;
   background: #2a3a50; border-radius: 2px;
-  margin: 10px auto 0; flex-shrink: 0; cursor: pointer;
 }
-.sheet-handle:hover { background: #4a5568; }
+.sheet-handle:hover::after { background: #4a5568; }
 
 /* header */
 .card-head {
@@ -650,9 +656,9 @@ function updateFab() {
   const fab = document.getElementById('fab-locate');
   let panelH = 0;
   if (card.classList.contains('open'))           panelH = card.offsetHeight;
-  else if (card.classList.contains('peek'))      panelH = 36;
+  else if (card.classList.contains('peek'))      panelH = 44;
   else if (explorePanel.classList.contains('open'))  panelH = explorePanel.offsetHeight;
-  else if (explorePanel.classList.contains('peek'))  panelH = 36;
+  else if (explorePanel.classList.contains('peek'))  panelH = 44;
   fab.style.bottom = (NAV_H + panelH + 14) + 'px';
 }
 new ResizeObserver(updateFab).observe(card);
