@@ -815,53 +815,95 @@ async function buildRoute() {
   setStatus('Строим маршрут…', 'info');
   btnRoute.disabled = true;
 
-  let built = false;
+  if (transportMode === 'foot') {
+    /* pedestrian: race Yandex + OSRM, keep the shorter result.
+       OSM often has courtyard footpaths (highway=footway) that the
+       Yandex JS-API graph (≠ Navigator app) doesn't include. */
+    const results = await Promise.allSettled([
+      (async () => {
+        const route = await ymaps.route(pts.map(p => [p.lat, p.lng]),
+          { routingMode: 'pedestrian', avoidTrafficJams: false, mapStateAutoApply: false });
+        let dist = 0, dur = 0;
+        const coords = [];
+        route.getPaths().each(path => {
+          dist += path.getLength() || 0;
+          dur  += path.getTime()   || 0;
+          const c = path.geometry.getCoordinates();
+          if (c) coords.push(...c);
+        });
+        if (coords.length < 2) throw new Error('empty');
+        return { coords, dist, dur };
+      })(),
+      (async () => {
+        const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
+        const r = await fetch(
+          `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
+          { signal: AbortSignal.timeout(12000) });
+        const d = await r.json();
+        if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+        const rt = d.routes[0];
+        return {
+          coords: rt.geometry.coordinates.map(c => [c[1], c[0]]),
+          dist: rt.distance, dur: rt.duration
+        };
+      })()
+    ]);
 
-  /* ── Yandex routing (primary — knows courtyards, bike paths) ── */
-  try {
-    const mode  = transportMode === 'bike' ? 'bicycle' : 'pedestrian';
-    const route = await ymaps.route(
-      pts.map(p => [p.lat, p.lng]),
-      { routingMode: mode, avoidTrafficJams: false, mapStateAutoApply: false }
-    );
-    let totalDist = 0, totalDur = 0;
-    const allCoords = [];
-    route.getPaths().each(path => {
-      totalDist += path.getLength() || 0;
-      totalDur  += path.getTime()   || 0;
-      const coords = path.geometry.getCoordinates();
-      if (coords) allCoords.push(...coords);
-    });
-    if (allCoords.length > 1) {
-      routeCoords = allCoords;
-      applyRouteStats(totalDist, totalDur);
+    const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+    if (valid.length > 0) {
+      const best = valid.reduce((a, b) => a.dist <= b.dist ? a : b);
+      routeCoords = best.coords;
+      applyRouteStats(best.dist, best.dur);
       drawRoute(routeCoords, pts);
       routeStrip.classList.add('visible');
       guideSec.classList.add('visible');
       setStatus('');
-      built = true;
+    } else {
+      setStatus('Не удалось построить маршрут', 'err');
     }
-  } catch (e) { console.warn('Yandex route failed, trying OSRM:', e.message); }
-
-  /* ── OSRM fallback ── */
-  if (!built) {
+  } else {
+    /* bike: Yandex primary (knows cycling lanes), OSRM fallback */
+    let built = false;
     try {
-      const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
-      const r  = await fetch(
-        `https://router.project-osrm.org/route/v1/${transportMode}/${cs}?overview=full&geometries=geojson`,
-        { signal: AbortSignal.timeout(12000) }
-      );
-      const d = await r.json();
-      if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
-      const rt = d.routes[0];
-      routeCoords = rt.geometry.coordinates.map(c => [c[1], c[0]]);
-      applyRouteStats(rt.distance, rt.duration);
-      drawRoute(routeCoords, pts);
-      routeStrip.classList.add('visible');
-      guideSec.classList.add('visible');
-      setStatus('');
-    } catch (e) {
-      setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+      const route = await ymaps.route(pts.map(p => [p.lat, p.lng]),
+        { routingMode: 'bicycle', avoidTrafficJams: false, mapStateAutoApply: false });
+      let totalDist = 0, totalDur = 0;
+      const allCoords = [];
+      route.getPaths().each(path => {
+        totalDist += path.getLength() || 0;
+        totalDur  += path.getTime()   || 0;
+        const coords = path.geometry.getCoordinates();
+        if (coords) allCoords.push(...coords);
+      });
+      if (allCoords.length > 1) {
+        routeCoords = allCoords;
+        applyRouteStats(totalDist, totalDur);
+        drawRoute(routeCoords, pts);
+        routeStrip.classList.add('visible');
+        guideSec.classList.add('visible');
+        setStatus('');
+        built = true;
+      }
+    } catch (e) { console.warn('Yandex bike route failed, trying OSRM:', e.message); }
+
+    if (!built) {
+      try {
+        const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
+        const r = await fetch(
+          `https://router.project-osrm.org/route/v1/bike/${cs}?overview=full&geometries=geojson`,
+          { signal: AbortSignal.timeout(12000) });
+        const d = await r.json();
+        if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+        const rt = d.routes[0];
+        routeCoords = rt.geometry.coordinates.map(c => [c[1], c[0]]);
+        applyRouteStats(rt.distance, rt.duration);
+        drawRoute(routeCoords, pts);
+        routeStrip.classList.add('visible');
+        guideSec.classList.add('visible');
+        setStatus('');
+      } catch (e) {
+        setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+      }
     }
   }
 
