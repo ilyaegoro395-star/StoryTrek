@@ -14,9 +14,9 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 /* ── floating search card — bottom sheet ── */
 #card {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: 64px; left: 0; right: 0;
   z-index: 20;
-  max-height: 80vh;
+  max-height: calc(82vh - 64px);
   background: #111827;
   border-radius: 16px 16px 0 0;
   border: 1px solid #1e2d40;
@@ -25,7 +25,10 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transform: translateY(110%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
 }
+#card.open { transform: translateY(0); }
 
 /* bottom-sheet drag handle */
 .sheet-handle {
@@ -46,15 +49,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .logo { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
 .logo span { color: #7ECBBD; }
 
-.btn-collapse {
-  background: none; border: none; color: #4a5568;
-  font-size: 20px; cursor: pointer; padding: 0 2px;
-  line-height: 1; display: flex; align-items: center;
-}
-.btn-collapse:hover { color: #e2e8f0; }
-
-/* collapsed state: only header visible */
-#card.collapsed .card-body { display: none; }
+/* btn-collapse removed — handle swipe replaces it */
 
 /* card body */
 .card-body {
@@ -319,6 +314,86 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 }
 #fab-locate:hover { background: #1a2535dd; }
 
+/* ── explore panel ── */
+#explore-panel {
+  position: fixed;
+  bottom: 64px; left: 0; right: 0;
+  z-index: 20;
+  max-height: calc(82vh - 64px);
+  background: #111827;
+  border-radius: 16px 16px 0 0;
+  border: 1px solid #1e2d40;
+  border-bottom: none;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(110%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+#explore-panel.open { transform: translateY(0); }
+.explore-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.explore-city-wrap { position: relative; }
+#dist-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.dist-btn {
+  padding: 5px 11px;
+  background: #1a2535; border: 1.5px solid #2a3a50;
+  color: #4a5568; font-size: 12px; font-weight: 600;
+  border-radius: 20px; cursor: pointer; transition: all .15s;
+}
+.dist-btn:hover { border-color: #7ECBBD; color: #7ECBBD; }
+.dist-btn.active { border-color: #7ECBBD; background: #0d2520; color: #7ECBBD; }
+#explore-cards { display: flex; flex-direction: column; gap: 12px; padding-bottom: 16px; }
+.ec-card {
+  background: #1a2535; border: 1.5px solid #2a3a50;
+  border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .15s;
+}
+.ec-card:hover { border-color: #7ECBBD; }
+.ec-img {
+  width: 100%; height: 130px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 52px; position: relative;
+}
+.ec-badge {
+  position: absolute; top: 10px; left: 10px;
+  background: rgba(0,0,0,.6); color: #fff;
+  font-size: 12px; font-weight: 600;
+  padding: 4px 9px; border-radius: 20px; backdrop-filter: blur(4px);
+}
+.ec-info { padding: 10px 12px 12px; }
+.ec-name { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+.ec-meta { font-size: 12px; color: #7ECBBD; font-weight: 600; margin-bottom: 4px; }
+.ec-desc { font-size: 12px; color: #64748b; line-height: 1.4; }
+.ec-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.ec-city { font-size: 11px; color: #4a5568; }
+.ec-type { font-size: 11px; color: #4a5568; }
+
+/* ── bottom navigation bar ── */
+#bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 64px;
+  z-index: 25;
+  background: #111827;
+  border-top: 1px solid #1e2d40;
+  display: flex;
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-icon {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  background: none; border: none;
+  cursor: pointer; color: #4a5568;
+  transition: color .15s;
+  font-size: 22px;
+}
+.nav-icon .nav-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+.nav-icon:hover { color: #a0b4c8; }
+.nav-icon.active { color: #7ECBBD; }
+
 /* ── position marker (referenced from ymaps template) ── */
 @keyframes pos-pulse {
   0%   { transform:scale(1);   opacity:.7 }
@@ -334,12 +409,11 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 
 <div id="map"></div>
 
-<!-- floating search card -->
+<!-- route builder panel -->
 <div id="card">
   <div class="sheet-handle" id="sheet-handle"></div>
   <div class="card-head">
     <div class="logo">Story<span>Trek</span></div>
-    <button class="btn-collapse" id="btn-collapse" title="Свернуть">▼</button>
   </div>
 
   <div class="card-body">
@@ -379,12 +453,51 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   </div>
 </div>
 
+<!-- explore: suggested routes panel -->
+<div id="explore-panel">
+  <div class="sheet-handle" id="explore-handle"></div>
+  <div class="card-head">
+    <div class="logo">Готовые маршруты</div>
+  </div>
+  <div class="card-body">
+    <div class="explore-filters">
+      <div class="explore-city-wrap">
+        <input id="explore-city" class="addr-input" type="text" placeholder="Город" value="Череповец" autocomplete="off">
+      </div>
+      <div id="dist-filter">
+        <button class="dist-btn active" data-km="0">Любое</button>
+        <button class="dist-btn" data-km="3">до 3 км</button>
+        <button class="dist-btn" data-km="5">до 5 км</button>
+        <button class="dist-btn" data-km="10">до 10 км</button>
+        <button class="dist-btn" data-km="20">до 20 км</button>
+      </div>
+    </div>
+    <div id="explore-cards"></div>
+  </div>
+</div>
+
 <button id="fab-locate" title="Моё местоположение">⊙</button>
 <div id="map-crosshair">📍</div>
 <div id="map-pick-panel">
   <div id="mpp-addr">Переместите карту для выбора точки</div>
   <button id="mpp-done">Готово</button>
 </div>
+
+<!-- bottom navigation bar -->
+<nav id="bottom-nav">
+  <button class="nav-icon" id="nav-route">
+    <span>🗺️</span>
+    <span class="nav-lbl">Маршрут</span>
+  </button>
+  <button class="nav-icon" id="nav-explore">
+    <span>🧭</span>
+    <span class="nav-lbl">Маршруты</span>
+  </button>
+  <button class="nav-icon" id="nav-saved">
+    <span>🔖</span>
+    <span class="nav-lbl">Сохранённые</span>
+  </button>
+</nav>
 
 <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
@@ -525,20 +638,57 @@ async function useMyLoc() {
   }, () => setStatus('Нет доступа к геолокации', 'err'));
 }
 
-/* ─── collapse toggle ─── */
-const card = document.getElementById('card');
+/* ─── panel open/close ─── */
+const card         = document.getElementById('card');
+const explorePanel = document.getElementById('explore-panel');
+const NAV_H        = 64;
 
-/* keep FAB above the bottom sheet — update whenever card resizes */
-new ResizeObserver(() => {
-  document.getElementById('fab-locate').style.bottom = (card.offsetHeight + 14) + 'px';
-}).observe(card);
-
-function toggleCard() {
-  card.classList.toggle('collapsed');
-  document.getElementById('btn-collapse').textContent = card.classList.contains('collapsed') ? '▲' : '▼';
+function updateFab() {
+  const fab = document.getElementById('fab-locate');
+  const openEl = card.classList.contains('open')         ? card
+               : explorePanel.classList.contains('open') ? explorePanel
+               : null;
+  fab.style.bottom = (NAV_H + (openEl ? openEl.offsetHeight : 0) + 14) + 'px';
 }
-document.getElementById('btn-collapse').addEventListener('click', toggleCard);
-document.getElementById('sheet-handle').addEventListener('click', toggleCard);
+new ResizeObserver(updateFab).observe(card);
+new ResizeObserver(updateFab).observe(explorePanel);
+updateFab();
+
+function closePanel() {
+  card.classList.remove('open');
+  explorePanel.classList.remove('open');
+  document.querySelectorAll('.nav-icon').forEach(b => b.classList.remove('active'));
+  updateFab();
+}
+
+function openPanel(which) {
+  if (which === 'route') {
+    card.classList.add('open');
+    explorePanel.classList.remove('open');
+    document.getElementById('nav-route').classList.add('active');
+    document.getElementById('nav-explore').classList.remove('active');
+  } else if (which === 'explore') {
+    explorePanel.classList.add('open');
+    card.classList.remove('open');
+    document.getElementById('nav-explore').classList.add('active');
+    document.getElementById('nav-route').classList.remove('active');
+    renderCatalog();
+  }
+  updateFab();
+}
+
+document.getElementById('sheet-handle').addEventListener('click', closePanel);
+document.getElementById('explore-handle').addEventListener('click', closePanel);
+
+document.getElementById('nav-route').addEventListener('click', () => {
+  card.classList.contains('open') ? closePanel() : openPanel('route');
+});
+document.getElementById('nav-explore').addEventListener('click', () => {
+  explorePanel.classList.contains('open') ? closePanel() : openPanel('explore');
+});
+document.getElementById('nav-saved').addEventListener('click', () => {
+  setStatus('Сохранённые маршруты — скоро', 'info');
+});
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
@@ -600,8 +750,6 @@ function bindWaypointEvents() {
     });
     inp.addEventListener('blur', () => setTimeout(() => closeSug(i), 200));
     inp.addEventListener('focus', () => {
-      card.classList.remove('collapsed');
-      document.getElementById('btn-collapse').textContent = '▼';
       if (inp.value.trim().length >= 2) {
         clearTimeout(sugTimers[i]);
         sugTimers[i] = setTimeout(() => fetchSug(i, inp.value.trim()), 350);
@@ -713,8 +861,7 @@ document.getElementById('transport-mode').addEventListener('click', e => {
 /* ─── map pick mode ─── */
 function activateMapPick(idx) {
   mapPickIdx = idx;
-  card.classList.add('collapsed');
-  document.getElementById('btn-collapse').textContent = '▲';
+  closePanel();
   document.getElementById('map-crosshair').classList.add('visible');
   document.getElementById('map-pick-panel').classList.add('visible');
   document.getElementById('mpp-addr').textContent = 'Переместите карту для выбора точки';
@@ -728,8 +875,7 @@ function cancelMapPick() {
   clearTimeout(mapPickTimer);
   document.getElementById('map-crosshair').classList.remove('visible');
   document.getElementById('map-pick-panel').classList.remove('visible');
-  card.classList.remove('collapsed');
-  document.getElementById('btn-collapse').textContent = '▼';
+  openPanel('route');
   document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
 }
 
@@ -815,53 +961,89 @@ async function buildRoute() {
   setStatus('Строим маршрут…', 'info');
   btnRoute.disabled = true;
 
-  let built = false;
-
-  /* ── Yandex routing (primary — knows courtyards, bike paths) ── */
-  try {
-    const mode  = transportMode === 'bike' ? 'bicycle' : 'pedestrian';
-    const route = await ymaps.route(
-      pts.map(p => [p.lat, p.lng]),
-      { routingMode: mode, avoidTrafficJams: false, mapStateAutoApply: false }
-    );
-    let totalDist = 0, totalDur = 0;
-    const allCoords = [];
-    route.getPaths().each(path => {
-      totalDist += path.getLength() || 0;
-      totalDur  += path.getTime()   || 0;
-      const coords = path.geometry.getCoordinates();
-      if (coords) allCoords.push(...coords);
-    });
-    if (allCoords.length > 1) {
-      routeCoords = allCoords;
-      applyRouteStats(totalDist, totalDur);
+  if (transportMode === 'foot') {
+    /* пешком: параллельно Яндекс + OSRM, берём короткий (OSM знает тропинки) */
+    const results = await Promise.allSettled([
+      (async () => {
+        const route = await ymaps.route(pts.map(p => [p.lat, p.lng]),
+          { routingMode: 'pedestrian', avoidTrafficJams: false, mapStateAutoApply: false });
+        let dist = 0, dur = 0;
+        const coords = [];
+        route.getPaths().each(path => {
+          dist += path.getLength() || 0;
+          dur  += path.getTime()   || 0;
+          const c = path.geometry.getCoordinates();
+          if (c) coords.push(...c);
+        });
+        if (coords.length < 2) throw new Error('empty');
+        return { coords, dist, dur };
+      })(),
+      (async () => {
+        const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
+        const r = await fetch(
+          `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
+          { signal: AbortSignal.timeout(12000) });
+        const d = await r.json();
+        if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+        const rt = d.routes[0];
+        return { coords: rt.geometry.coordinates.map(c => [c[1], c[0]]),
+                 dist: rt.distance, dur: rt.duration };
+      })()
+    ]);
+    const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+    if (valid.length > 0) {
+      const best = valid.reduce((a, b) => a.dist <= b.dist ? a : b);
+      routeCoords = best.coords;
+      applyRouteStats(best.dist, best.dur);
       drawRoute(routeCoords, pts);
       routeStrip.classList.add('visible');
       guideSec.classList.add('visible');
       setStatus('');
-      built = true;
+    } else {
+      setStatus('Не удалось построить маршрут', 'err');
     }
-  } catch (e) { console.warn('Yandex route failed, trying OSRM:', e.message); }
-
-  /* ── OSRM fallback ── */
-  if (!built) {
+  } else {
+    /* велосипед: Яндекс главный (знает велодорожки), OSRM запасной */
+    let built = false;
     try {
-      const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
-      const r  = await fetch(
-        `https://router.project-osrm.org/route/v1/${transportMode}/${cs}?overview=full&geometries=geojson`,
-        { signal: AbortSignal.timeout(12000) }
-      );
-      const d = await r.json();
-      if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
-      const rt = d.routes[0];
-      routeCoords = rt.geometry.coordinates.map(c => [c[1], c[0]]);
-      applyRouteStats(rt.distance, rt.duration);
-      drawRoute(routeCoords, pts);
-      routeStrip.classList.add('visible');
-      guideSec.classList.add('visible');
-      setStatus('');
-    } catch (e) {
-      setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+      const route = await ymaps.route(pts.map(p => [p.lat, p.lng]),
+        { routingMode: 'bicycle', avoidTrafficJams: false, mapStateAutoApply: false });
+      let totalDist = 0, totalDur = 0;
+      const allCoords = [];
+      route.getPaths().each(path => {
+        totalDist += path.getLength() || 0;
+        totalDur  += path.getTime()   || 0;
+        const coords = path.geometry.getCoordinates();
+        if (coords) allCoords.push(...coords);
+      });
+      if (allCoords.length > 1) {
+        routeCoords = allCoords;
+        applyRouteStats(totalDist, totalDur);
+        drawRoute(routeCoords, pts);
+        routeStrip.classList.add('visible');
+        guideSec.classList.add('visible');
+        setStatus('');
+        built = true;
+      }
+    } catch (e) { console.warn('Yandex bike route failed, trying OSRM:', e.message); }
+    if (!built) {
+      try {
+        const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
+        const r = await fetch(
+          `https://router.project-osrm.org/route/v1/bike/${cs}?overview=full&geometries=geojson`,
+          { signal: AbortSignal.timeout(12000) });
+        const d = await r.json();
+        if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
+        const rt = d.routes[0];
+        routeCoords = rt.geometry.coordinates.map(c => [c[1], c[0]]);
+        applyRouteStats(rt.distance, rt.duration);
+        drawRoute(routeCoords, pts);
+        routeStrip.classList.add('visible');
+        guideSec.classList.add('visible');
+        setStatus('');
+      } catch (e) {
+        setStatus('Не удалось построить маршрут: ' + e.message, 'err');
+      }
     }
   }
 
@@ -1072,6 +1254,159 @@ function onNavPosition(pos) {
     if (haversine(me, coord) < 80) playSegment(i);
   });
 }
+
+/* ─── explore: route catalog ─── */
+const CATALOG = [
+  /* Череповец */
+  { id:'che-historic', city:'Череповец', name:'Историческое сердце', type:'foot',
+    distKm:3.5, durationMin:90, color:'linear-gradient(135deg,#1e3a5f,#2a6496)', emoji:'⛪',
+    desc:'Соборная горка · Музей Верещагина · набережная Шексны',
+    points:[
+      { lat:59.1241, lng:37.9040, text:'Соборная горка, Череповец' },
+      { lat:59.1243, lng:37.9087, text:'Музей Верещагина, Череповец' },
+      { lat:59.1154, lng:37.9013, text:'Набережная Шексны, Череповец' },
+    ]},
+  { id:'che-sheksna', city:'Череповец', name:'Вдоль Шексны', type:'foot',
+    distKm:5, durationMin:80, color:'linear-gradient(135deg,#1a4a2a,#2d8a3e)', emoji:'🌊',
+    desc:'Речная набережная · Зашекснинский район · парк у воды',
+    points:[
+      { lat:59.1154, lng:37.9013, text:'Набережная Шексны, Череповец' },
+      { lat:59.1076, lng:37.8986, text:'Парк Металлургов, Череповец' },
+    ]},
+  { id:'che-metal', city:'Череповец', name:'Город металлургов', type:'bike',
+    distKm:14, durationMin:65, color:'linear-gradient(135deg,#2d1b4e,#6b3fa0)', emoji:'🏭',
+    desc:'Проспект Победы · Дворец Химиков · площадь Металлургов',
+    points:[
+      { lat:59.1254, lng:37.9063, text:'Проспект Победы, Череповец' },
+      { lat:59.1183, lng:37.9200, text:'Дворец Химиков, Череповец' },
+      { lat:59.0965, lng:37.9201, text:'Площадь Металлургов, Череповец' },
+    ]},
+  /* Вологда */
+  { id:'vol-kremlin', city:'Вологда', name:'Вологодский кремль', type:'foot',
+    distKm:4, durationMin:100, color:'linear-gradient(135deg,#3d1c1c,#8b3030)', emoji:'🏰',
+    desc:'Кремль · Воскресенский собор · Музей кружева',
+    points:[
+      { lat:59.2205, lng:39.8836, text:'Вологодский кремль' },
+      { lat:59.2183, lng:39.8839, text:'Музей кружева, Вологда' },
+      { lat:59.2195, lng:39.8726, text:'Набережная реки Вологды' },
+    ]},
+  { id:'vol-monastyr', city:'Вологда', name:'Спасо-Прилуцкий монастырь', type:'bike',
+    distKm:8, durationMin:45, color:'linear-gradient(135deg,#1a3a2a,#2d7a4a)', emoji:'🕌',
+    desc:'Вдоль реки до монастыря XVI века · живописный маршрут',
+    points:[
+      { lat:59.2205, lng:39.8836, text:'Кремль, Вологда' },
+      { lat:59.2329, lng:39.8524, text:'Спасо-Прилуцкий монастырь, Вологда' },
+    ]},
+  /* Ярославль */
+  { id:'yar-historic', city:'Ярославль', name:'ЮНЕСКО: исторический центр', type:'foot',
+    distKm:5, durationMin:120, color:'linear-gradient(135deg,#2a1a3e,#5a3070)', emoji:'🏛️',
+    desc:'Стрелка · Спасский монастырь · ул. Советская',
+    points:[
+      { lat:57.6210, lng:39.8890, text:'Стрелка, Ярославль' },
+      { lat:57.6282, lng:39.8931, text:'Спасо-Преображенский монастырь, Ярославль' },
+      { lat:57.6262, lng:39.8853, text:'Улица Советская, Ярославль' },
+    ]},
+  { id:'yar-volga', city:'Ярославль', name:'По набережной Волги', type:'bike',
+    distKm:15, durationMin:70, color:'linear-gradient(135deg,#0d2a3a,#1a6a9a)', emoji:'⚓',
+    desc:'Самая длинная набережная России · речной вокзал',
+    points:[
+      { lat:57.6246, lng:39.8797, text:'Речной вокзал, Ярославль' },
+      { lat:57.6210, lng:39.8890, text:'Стрелка, Ярославль' },
+      { lat:57.6098, lng:39.9024, text:'Парк на Волжской набережной, Ярославль' },
+    ]},
+  /* Кострома */
+  { id:'kos-ipatiev', city:'Кострома', name:'Колыбель Романовых', type:'foot',
+    distKm:4.5, durationMin:110, color:'linear-gradient(135deg,#3d2a0a,#8b6820)', emoji:'👑',
+    desc:'Ипатьевский монастырь · Торговые ряды · Сусанинская площадь',
+    points:[
+      { lat:57.7736, lng:40.9181, text:'Ипатьевский монастырь, Кострома' },
+      { lat:57.7698, lng:40.9283, text:'Торговые ряды, Кострома' },
+      { lat:57.7674, lng:40.9269, text:'Сусанинская площадь, Кострома' },
+    ]},
+  /* Тверь */
+  { id:'tver-center', city:'Тверь', name:'Имперская Тверь', type:'foot',
+    distKm:4, durationMin:100, color:'linear-gradient(135deg,#1a1a3a,#3a3a8a)', emoji:'🌉',
+    desc:'Путевой дворец · набережная Волги · Старый мост',
+    points:[
+      { lat:56.8634, lng:35.9157, text:'Путевой дворец, Тверь' },
+      { lat:56.8598, lng:35.9116, text:'Набережная Волги, Тверь' },
+      { lat:56.8572, lng:35.9087, text:'Старый Волжский мост, Тверь' },
+    ]},
+  /* Великий Новгород */
+  { id:'nov-kremlin', city:'Великий Новгород', name:'Новгородский детинец', type:'foot',
+    distKm:4, durationMin:110, color:'linear-gradient(135deg,#1c3a1c,#2d6b2d)', emoji:'🏯',
+    desc:'Новгородский кремль · Ярославово дворище · набережная Волхова',
+    points:[
+      { lat:58.5215, lng:31.2756, text:'Новгородский кремль' },
+      { lat:58.5188, lng:31.2814, text:'Ярославово дворище, Великий Новгород' },
+      { lat:58.5222, lng:31.2789, text:'Набережная Волхова, Великий Новгород' },
+    ]},
+];
+
+let exploreCity  = 'Череповец';
+let exploreMaxKm = 0;
+
+function renderCatalog() {
+  const cardsEl = document.getElementById('explore-cards');
+  const city = exploreCity.trim().toLowerCase();
+  const filtered = CATALOG.filter(r => {
+    if (city && !r.city.toLowerCase().includes(city)) return false;
+    if (exploreMaxKm > 0 && r.distKm > exploreMaxKm) return false;
+    return true;
+  });
+  if (filtered.length === 0) {
+    cardsEl.innerHTML = '<div style="color:#4a5568;text-align:center;padding:24px 0">Маршруты не найдены</div>';
+    return;
+  }
+  cardsEl.innerHTML = filtered.map(r => {
+    const dist = r.distKm >= 1 ? `${r.distKm} км` : `${r.distKm * 1000} м`;
+    const dur  = r.durationMin >= 60
+      ? `${Math.floor(r.durationMin/60)} ч ${r.durationMin % 60 ? r.durationMin%60+' мин' : ''}`
+      : `${r.durationMin} мин`;
+    const mode = r.type === 'foot' ? '🚶 Пешком' : '🚲 Велосипед';
+    return `<div class="ec-card" onclick="loadCatalogRoute('${r.id}')">
+      <div class="ec-img" style="background:${r.color}">
+        <span>${r.emoji}</span>
+        <div class="ec-badge">${dist} · ${dur}</div>
+      </div>
+      <div class="ec-info">
+        <div class="ec-name">${r.name}</div>
+        <div class="ec-desc">${r.desc}</div>
+        <div class="ec-foot">
+          <span class="ec-city">📍 ${r.city}</span>
+          <span class="ec-type">${mode}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadCatalogRoute(id) {
+  const route = CATALOG.find(r => r.id === id);
+  if (!route) return;
+  waypoints = route.points.map(p => ({ lat: p.lat, lng: p.lng, text: p.text }));
+  transportMode = route.type;
+  document.querySelectorAll('.mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === transportMode));
+  openPanel('route');
+  renderWaypointList();
+  updateBtn();
+  buildRoute();
+}
+
+document.getElementById('explore-city').addEventListener('input', e => {
+  exploreCity = e.target.value;
+  renderCatalog();
+});
+
+document.getElementById('dist-filter').addEventListener('click', e => {
+  const btn = e.target.closest('.dist-btn');
+  if (!btn) return;
+  document.querySelectorAll('.dist-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  exploreMaxKm = parseInt(btn.dataset.km);
+  renderCatalog();
+});
 
 /* ─── status ─── */
 function setStatus(msg, type = '') {
