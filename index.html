@@ -100,18 +100,18 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .wp-item { display: flex; align-items: center; gap: 5px; padding: 1px 0; }
 .wp-item.dragging { opacity: 0.35; }
 .drag-handle {
-  width: 18px; height: 36px; display: flex; align-items: center; justify-content: center;
-  color: #374151; font-size: 16px; cursor: grab; flex-shrink: 0;
-  user-select: none; touch-action: none;
+  width: 22px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #4a5568; font-size: 18px; cursor: grab; flex-shrink: 0;
+  user-select: none; touch-action: none; letter-spacing: -2px;
 }
 .drag-handle:hover { color: #7ECBBD; }
 .wp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .wp-remove {
-  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
-  background: none; border: 1px solid #2a3a50; color: #374151;
-  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0;
+  background: none; border: none; color: #4a5568;
+  font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.wp-remove:hover { background: #2d1a1a; border-color: #4a2a2a; color: #f87171; }
+.wp-remove:hover { color: #f87171; }
 #btn-add-wp {
   width: 100%; padding: 7px;
   background: none; border: 1.5px dashed #2a3a50; color: #4a5568;
@@ -119,19 +119,58 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 }
 #btn-add-wp:hover { border-color: #7ECBBD; color: #7ECBBD; }
 .btn-map-pick {
-  width: 26px; height: 36px; border-radius: 8px; flex-shrink: 0;
-  background: #1a2535; border: 1.5px solid #2a3a50; color: #7ECBBD;
-  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 30px; border-radius: 6px; flex-shrink: 0;
+  background: none; border: none; color: #4a5568;
+  font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.btn-map-pick:hover { background: #263347; }
-.btn-map-pick.active { border-color: #7ECBBD; background: #172a40; }
-#map-pick-hint {
-  position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%);
-  background: rgba(14,26,46,0.96); color: #7ECBBD; border: 1px solid #2a4a6a;
-  padding: 9px 16px; border-radius: 12px; font-size: 13px; font-weight: 600;
-  z-index: 30; display: none; pointer-events: none; white-space: nowrap;
+.btn-map-pick:hover { color: #7ECBBD; }
+.btn-map-pick.active { color: #7ECBBD; }
+
+/* ── transport mode ── */
+#transport-mode {
+  display: flex; gap: 6px; margin-top: 2px;
 }
-#map-pick-hint.visible { display: block; }
+.mode-btn {
+  flex: 1; padding: 7px 4px;
+  background: #1a2535; border: 1.5px solid #2a3a50;
+  color: #4a5568; font-size: 18px;
+  border-radius: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  transition: all .15s;
+}
+.mode-btn span { font-size: 11px; font-weight: 600; }
+.mode-btn:hover { border-color: #7ECBBD; color: #7ECBBD; }
+.mode-btn.active { border-color: #7ECBBD; background: #0d2520; color: #7ECBBD; }
+
+/* ── map pick crosshair ── */
+#map-crosshair {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 25; display: none; pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+  font-size: 40px; line-height: 1;
+}
+#map-crosshair.visible { display: block; }
+#map-pick-panel {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #111827; border-top: 1px solid #1e2d40;
+  border-radius: 16px 16px 0 0;
+  padding: 14px 16px 28px;
+  z-index: 30; display: none;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+#map-pick-panel.visible { display: block; }
+#mpp-addr {
+  font-size: 14px; color: #e2e8f0; font-weight: 500;
+  margin-bottom: 12px; min-height: 20px;
+}
+#mpp-done {
+  width: 100%; padding: 12px;
+  background: #7ECBBD; color: #0d1117;
+  font-size: 15px; font-weight: 700;
+  border: none; border-radius: 12px; cursor: pointer;
+}
+#mpp-done:hover { background: #6bbcae; }
 
 /* ── suggestions dropdown ── */
 .sug-box {
@@ -303,12 +342,17 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
     <div id="waypoint-list"></div>
     <button id="btn-add-wp">+ Промежуточная точка</button>
 
+    <div id="transport-mode">
+      <button class="mode-btn active" data-mode="foot">🚶 <span>Пешком</span></button>
+      <button class="mode-btn" data-mode="bike">🚲 <span>Велосипед</span></button>
+    </div>
+
     <button id="btn-route" disabled>Построить маршрут</button>
 
     <!-- stats after route -->
     <div id="route-strip">
       <div class="rs-stat"><div class="rs-val" id="rs-dist">—</div><div class="rs-lbl">расстояние</div></div>
-      <div class="rs-stat"><div class="rs-val" id="rs-dur">—</div><div class="rs-lbl">пешком</div></div>
+      <div class="rs-stat"><div class="rs-val" id="rs-dur">—</div><div class="rs-lbl" id="rs-mode-lbl">пешком</div></div>
       <button class="btn-strip-clear" id="btn-clear">✕</button>
     </div>
 
@@ -331,7 +375,11 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 </div>
 
 <button id="fab-locate" title="Моё местоположение">⊙</button>
-<div id="map-pick-hint">📍 Нажмите на карту чтобы выбрать точку</div>
+<div id="map-crosshair">📍</div>
+<div id="map-pick-panel">
+  <div id="mpp-addr">Переместите карту для выбора точки</div>
+  <button id="mpp-done">Готово</button>
+</div>
 
 <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
@@ -357,10 +405,12 @@ let playGen = 0;
 let navActive = false;
 let navPaused = false;
 
-let sugTimers  = [];
-let activeSug  = -1;
-let mapPickIdx = -1;
-let drag       = null;
+let sugTimers     = [];
+let activeSug     = -1;
+let mapPickIdx    = -1;
+let drag          = null;
+let transportMode = 'foot';
+let mapPickTimer  = null;
 
 /* ─── DOM ─── */
 const btnRoute    = document.getElementById('btn-route');
@@ -387,27 +437,37 @@ ymaps.ready(() => {
   startPosWatch();
   renderWaypointList();
 
-  ymap.events.add('click', async e => {
+  ymap.events.add('boundschange', () => {
     if (mapPickIdx < 0) return;
-    const [lat, lng] = e.get('coords');
-    const idx = mapPickIdx;
-    cancelMapPick();
-    setStatus('Определяем адрес…', 'info');
-    try {
-      const result = await ymaps.geocode([lat, lng], { results: 1 });
-      const obj = result.geoObjects.get(0);
-      const text = obj
-        ? (obj.properties.get('text') || obj.getAddressLine())
-        : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      waypoints[idx] = { lat, lng, text };
-    } catch {
-      waypoints[idx] = { lat, lng, text: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
-    }
-    renderWaypointList();
-    updateBtn();
-    setStatus('');
+    clearTimeout(mapPickTimer);
+    const addrEl = document.getElementById('mpp-addr');
+    if (addrEl) addrEl.textContent = 'Определяем адрес…';
+    mapPickTimer = setTimeout(() => {
+      const center = ymap.getCenter();
+      geocodeCenter(center[0], center[1]);
+    }, 600);
   });
 });
+
+async function geocodeCenter(lat, lng) {
+  try {
+    const result = await ymaps.geocode([lat, lng], { results: 1 });
+    const obj = result.geoObjects.get(0);
+    const text = obj
+      ? (obj.properties.get('text') || obj.getAddressLine())
+      : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const addrEl = document.getElementById('mpp-addr');
+    if (addrEl) addrEl.textContent = text;
+    const doneBtn = document.getElementById('mpp-done');
+    if (doneBtn) { doneBtn.dataset.lat = lat; doneBtn.dataset.lng = lng; doneBtn.dataset.text = text; }
+  } catch {
+    const text = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const addrEl = document.getElementById('mpp-addr');
+    if (addrEl) addrEl.textContent = text;
+    const doneBtn = document.getElementById('mpp-done');
+    if (doneBtn) { doneBtn.dataset.lat = lat; doneBtn.dataset.lng = lng; doneBtn.dataset.text = text; }
+  }
+}
 
 /* ─── geolocation ─── */
 function startPosWatch() {
@@ -491,7 +551,6 @@ function renderWaypointList() {
     const ph = i === 0 ? 'Откуда' : i === waypoints.length - 1 ? 'Куда' : 'Промежуточная точка';
     row.innerHTML = `
       <div class="wp-item" data-idx="${i}">
-        <span class="drag-handle" data-idx="${i}">⠿</span>
         <span class="wp-dot" style="background:${wpDotColor(i, waypoints.length)}"></span>
         <input class="addr-input wp-inp" type="text" placeholder="${ph}"
           autocomplete="off" spellcheck="false" data-idx="${i}"
@@ -499,6 +558,7 @@ function renderWaypointList() {
         ${i === 0 ? '<button class="btn-loc" id="btn-my-loc" title="Моё место">⊙</button>' : ''}
         <button class="btn-map-pick" data-idx="${i}" title="Выбрать на карте">📍</button>
         ${waypoints.length > 2 ? `<button class="wp-remove" data-idx="${i}">✕</button>` : ''}
+        <span class="drag-handle" data-idx="${i}">⠿</span>
       </div>
       <div class="sug-box wp-sug" data-idx="${i}"></div>`;
     if (wp) row.querySelector('.wp-inp').classList.add('confirmed');
@@ -623,18 +683,49 @@ document.getElementById('btn-add-wp').addEventListener('click', () => {
   renderWaypointList(); updateBtn();
 });
 
+document.getElementById('transport-mode').addEventListener('click', e => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  transportMode = btn.dataset.mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+});
+
 /* ─── map pick mode ─── */
 function activateMapPick(idx) {
   mapPickIdx = idx;
-  document.getElementById('map-pick-hint').classList.add('visible');
-  document.querySelectorAll('.btn-map-pick').forEach((btn, i) =>
+  card.classList.add('collapsed');
+  document.getElementById('btn-collapse').textContent = '▲';
+  document.getElementById('map-crosshair').classList.add('visible');
+  document.getElementById('map-pick-panel').classList.add('visible');
+  document.getElementById('mpp-addr').textContent = 'Переместите карту для выбора точки';
+  document.querySelectorAll('.btn-map-pick').forEach(btn =>
     btn.classList.toggle('active', parseInt(btn.dataset.idx) === idx));
+  const center = ymap.getCenter();
+  geocodeCenter(center[0], center[1]);
 }
 function cancelMapPick() {
   mapPickIdx = -1;
-  document.getElementById('map-pick-hint').classList.remove('visible');
+  clearTimeout(mapPickTimer);
+  document.getElementById('map-crosshair').classList.remove('visible');
+  document.getElementById('map-pick-panel').classList.remove('visible');
+  card.classList.remove('collapsed');
+  document.getElementById('btn-collapse').textContent = '—';
   document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
 }
+
+document.getElementById('mpp-done').addEventListener('click', () => {
+  const doneBtn = document.getElementById('mpp-done');
+  const lat  = parseFloat(doneBtn.dataset.lat);
+  const lng  = parseFloat(doneBtn.dataset.lng);
+  const text = doneBtn.dataset.text || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  const idx  = mapPickIdx;
+  if (!isNaN(lat) && !isNaN(lng) && idx >= 0) {
+    cancelMapPick();
+    waypoints[idx] = { lat, lng, text };
+    renderWaypointList();
+    updateBtn();
+  }
+});
 
 /* ─── suggestions ─── */
 async function fetchSug(i, val) {
@@ -697,7 +788,7 @@ async function buildRoute() {
   try {
     const cs  = pts.map(w => `${w.lng},${w.lat}`).join(';');
     const r   = await fetch(
-      `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
+      `https://router.project-osrm.org/route/v1/${transportMode}/${cs}?overview=full&geometries=geojson`,
       { signal: AbortSignal.timeout(12000) }
     );
     const d = await r.json();
@@ -711,6 +802,8 @@ async function buildRoute() {
     rsDist.textContent = distM >= 1000 ? `${(distM/1000).toFixed(1)} км` : `${distM} м`;
     const dm = Math.round(durSec/60);
     rsDur.textContent = dm >= 60 ? `${Math.floor(dm/60)} ч ${dm%60} мин` : `${dm} мин`;
+    const modeLbl = document.getElementById('rs-mode-lbl');
+    if (modeLbl) modeLbl.textContent = transportMode === 'bike' ? 'велосипед' : 'пешком';
 
     drawRoute(routeCoords, pts);
     routeStrip.classList.add('visible');
