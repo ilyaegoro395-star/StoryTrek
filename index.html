@@ -28,6 +28,9 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
   transform: translateY(110%);
   transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
 }
+#card.peek, #explore-panel.peek {
+  transform: translateY(calc(100% - 36px)); /* полоска-ручка торчит над навбаром */
+}
 #card.open { transform: translateY(0); }
 
 /* bottom-sheet drag handle */
@@ -645,50 +648,102 @@ const NAV_H        = 64;
 
 function updateFab() {
   const fab = document.getElementById('fab-locate');
-  const openEl = card.classList.contains('open')         ? card
-               : explorePanel.classList.contains('open') ? explorePanel
-               : null;
-  fab.style.bottom = (NAV_H + (openEl ? openEl.offsetHeight : 0) + 14) + 'px';
+  let panelH = 0;
+  if (card.classList.contains('open'))           panelH = card.offsetHeight;
+  else if (card.classList.contains('peek'))      panelH = 36;
+  else if (explorePanel.classList.contains('open'))  panelH = explorePanel.offsetHeight;
+  else if (explorePanel.classList.contains('peek'))  panelH = 36;
+  fab.style.bottom = (NAV_H + panelH + 14) + 'px';
 }
 new ResizeObserver(updateFab).observe(card);
 new ResizeObserver(updateFab).observe(explorePanel);
 updateFab();
 
-function closePanel() {
-  card.classList.remove('open');
-  explorePanel.classList.remove('open');
-  document.querySelectorAll('.nav-icon').forEach(b => b.classList.remove('active'));
+function peekPanel(which) {
+  const el    = which === 'route' ? card : explorePanel;
+  const other = which === 'route' ? explorePanel : card;
+  el.classList.remove('open');
+  el.classList.add('peek');
+  other.classList.remove('open', 'peek');
+  document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.add('active');
+  document.getElementById(which === 'route' ? 'nav-explore' : 'nav-route').classList.remove('active');
   updateFab();
 }
 
 function openPanel(which) {
-  if (which === 'route') {
-    card.classList.add('open');
-    explorePanel.classList.remove('open');
-    document.getElementById('nav-route').classList.add('active');
-    document.getElementById('nav-explore').classList.remove('active');
-  } else if (which === 'explore') {
-    explorePanel.classList.add('open');
-    card.classList.remove('open');
-    document.getElementById('nav-explore').classList.add('active');
-    document.getElementById('nav-route').classList.remove('active');
-    renderCatalog();
-  }
+  const el    = which === 'route' ? card : explorePanel;
+  const other = which === 'route' ? explorePanel : card;
+  el.classList.add('open');
+  el.classList.remove('peek');
+  other.classList.remove('open', 'peek');
+  document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.add('active');
+  document.getElementById(which === 'route' ? 'nav-explore' : 'nav-route').classList.remove('active');
+  if (which === 'explore') renderCatalog();
   updateFab();
 }
 
-document.getElementById('sheet-handle').addEventListener('click', closePanel);
-document.getElementById('explore-handle').addEventListener('click', closePanel);
+function togglePanel(which) {
+  const el = which === 'route' ? card : explorePanel;
+  if (el.classList.contains('open')) peekPanel(which);
+  else openPanel(which);
+}
+
+/* ── swipe gesture on both handles ── */
+function addPanelSwipe(panel, handleEl, which) {
+  let startY = 0, startOpen = false, moved = false;
+
+  handleEl.addEventListener('touchstart', e => {
+    startY    = e.touches[0].clientY;
+    startOpen = panel.classList.contains('open');
+    moved     = false;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  handleEl.addEventListener('touchmove', e => {
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > 4) moved = true;
+    const peekOffset = panel.offsetHeight - 36;
+    const offset = startOpen
+      ? Math.max(0, Math.min(peekOffset, dy))          /* от open: только вниз */
+      : Math.max(0, peekOffset + Math.min(0, dy));     /* от peek: только вверх */
+    panel.style.transform = `translateY(${offset}px)`;
+  }, { passive: true });
+
+  handleEl.addEventListener('touchend', e => {
+    const dy = e.changedTouches[0].clientY - startY;
+    panel.style.transition = '';
+    panel.style.transform  = '';
+    if (!moved) {
+      togglePanel(which);
+    } else if (startOpen && dy > 80) {
+      peekPanel(which);
+    } else if (!startOpen && dy < -60) {
+      openPanel(which);
+    }
+    /* иначе CSS класс "snap back" сам вернёт в нужное положение */
+    updateFab();
+  });
+}
+
+addPanelSwipe(card, document.getElementById('sheet-handle'), 'route');
+addPanelSwipe(explorePanel, document.getElementById('explore-handle'), 'explore');
 
 document.getElementById('nav-route').addEventListener('click', () => {
-  card.classList.contains('open') ? closePanel() : openPanel('route');
+  const el = card;
+  if (el.classList.contains('open')) peekPanel('route');
+  else openPanel('route');
 });
 document.getElementById('nav-explore').addEventListener('click', () => {
-  explorePanel.classList.contains('open') ? closePanel() : openPanel('explore');
+  const el = explorePanel;
+  if (el.classList.contains('open')) peekPanel('explore');
+  else openPanel('explore');
 });
 document.getElementById('nav-saved').addEventListener('click', () => {
   setStatus('Сохранённые маршруты — скоро', 'info');
 });
+
+/* при старте показываем полоску маршрутной панели */
+peekPanel('route');
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
@@ -861,7 +916,8 @@ document.getElementById('transport-mode').addEventListener('click', e => {
 /* ─── map pick mode ─── */
 function activateMapPick(idx) {
   mapPickIdx = idx;
-  closePanel();
+  card.classList.remove('open', 'peek');
+  explorePanel.classList.remove('open', 'peek');
   document.getElementById('map-crosshair').classList.add('visible');
   document.getElementById('map-pick-panel').classList.add('visible');
   document.getElementById('mpp-addr').textContent = 'Переместите карту для выбора точки';
@@ -875,7 +931,7 @@ function cancelMapPick() {
   clearTimeout(mapPickTimer);
   document.getElementById('map-crosshair').classList.remove('visible');
   document.getElementById('map-pick-panel').classList.remove('visible');
-  openPanel('route');
+  peekPanel('route');
   document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
 }
 
