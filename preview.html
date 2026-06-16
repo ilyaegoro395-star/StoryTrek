@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StoryTrek — Предпросмотр редизайна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0A0E1A;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 32px;
+  padding: 32px 24px 64px;
+  flex-wrap: wrap;
+}
+
+h2 {
+  color: #7A92A8;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* ── phone frame ── */
+.frame {
+  width: 375px;
+  flex-shrink: 0;
+}
+.phone {
+  width: 375px;
+  height: 812px;
+  background: #08101A;
+  border-radius: 44px;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 0 0 8px #1A2535,
+    0 0 0 10px #0D1825,
+    0 32px 80px rgba(0,0,0,0.8);
+}
+
+/* map bg */
+.map-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(0,80,120,0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 60%, rgba(0,60,80,0.25) 0%, transparent 60%),
+    linear-gradient(180deg, #0D1825 0%, #0A1520 100%);
+}
+
+/* map grid lines */
+.map-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* map route */
+.route-line {
+  position: absolute;
+  top: 180px; left: 80px;
+  width: 200px; height: 2px;
+  background: linear-gradient(90deg, #2DD4C8, #60C8F5);
+  border-radius: 2px;
+  box-shadow: 0 0 12px rgba(45,212,200,0.6);
+  transform: rotate(-15deg);
+}
+.route-line::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: -1px;
+  width: 8px; height: 6px; border-radius: 50%;
+  background: #2DD4C8;
+  box-shadow: 0 0 8px rgba(45,212,200,0.8);
+}
+.route-line::after {
+  content: '';
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 8px; height: 6px; border-radius: 50%;
+  background: #FF6B7A;
+  box-shadow: 0 0 8px rgba(255,107,122,0.8);
+}
+
+/* FAB */
+.fab {
+  position: absolute;
+  right: 16px; bottom: 152px;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: rgba(13,24,37,0.88);
+  border: 1px solid rgba(255,255,255,0.13);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  color: #2DD4C8;
+  font-size: 18px;
+}
+
+/* ── bottom nav ── */
+.bottom-nav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 64px;
+  background: rgba(9,16,27,0.96);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  backdrop-filter: blur(16px);
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #3D5060;
+  position: relative;
+}
+.nav-item.active { color: #2DD4C8; }
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 8px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #2DD4C8;
+  box-shadow: 0 0 6px #2DD4C8;
+}
+.nav-item svg { width: 22px; height: 22px; }
+.nav-lbl {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.3px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── route builder panel ── */
+.panel {
+  position: absolute;
+  bottom: 64px; left: 0; right: 0;
+  background: #0D1825;
+  border-radius: 20px 20px 0 0;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-bottom: none;
+  box-shadow: 0 -16px 56px rgba(0,0,0,0.65), 0 -1px 0 rgba(45,212,200,0.07);
+  overflow: hidden;
+}
+
+.handle {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.handle::after {
+  content: '';
+  width: 44px; height: 4px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 100px;
+}
+
+.panel-head {
+  padding: 0 18px 12px;
+  display: flex;
+  align-items: center;
+}
+.logo {
+  font-size: 19px;
+  font-weight: 700;
+  color: #E8F2FF;
+  letter-spacing: -0.5px;
+}
+.logo span {
+  background: linear-gradient(90deg, #2DD4C8, #60C8F5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.panel-body {
+  padding: 0 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.wp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wp-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wp-input {
+  flex: 1;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 11px;
+  padding: 10px 13px;
+  color: #E8F2FF;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+.wp-input.confirmed {
+  border-color: rgba(45,212,200,0.4);
+  background: rgba(45,212,200,0.06);
+  color: #C8EBE8;
+}
+.wp-icon {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: #3D5060;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.transport-row {
+  display: flex;
+  gap: 8px;
+}
+.mode-btn {
+  flex: 1;
+  padding: 9px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: #3D5060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+}
+.mode-btn svg { width: 17px; height: 17px; }
+.mode-btn.active {
+  border-color: #2DD4C8;
+  background: rgba(45,212,200,0.14);
+  color: #2DD4C8;
+}
+
+.btn-route {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #F97316, #E8530A);
+  color: #fff;
+  font-size: 14px; font-weight: 700;
+  border: none; border-radius: 13px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 20px rgba(249,115,22,0.3);
+  cursor: pointer;
+  text-align: center;
+}
+
+.route-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #121F30;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 13px;
+  padding: 10px 14px;
+}
+.stat { text-align: center; }
+.stat-val { font-size: 15px; font-weight: 700; color: #2DD4C8; }
+.stat-lbl { font-size: 11px; color: #7A92A8; margin-top: 2px; }
+.clear-btn { color: #3D5060; font-size: 16px; }
+
+.btn-guide {
+  padding: 12px;
+  background: rgba(45,212,200,0.08);
+  color: #2DD4C8;
+  font-size: 14px; font-weight: 600;
+  border: 1px solid rgba(45,212,200,0.3);
+  border-radius: 13px;
+  font-family: 'Inter', sans-serif;
+  text-align: center;
+}
+
+/* ── explore panel ── */
+.explore-panel {
+  position: absolute;
+  bottom: 64px; left: 0; right: 0;
+  background: #0D1825;
+  border-radius: 20px 20px 0 0;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-bottom: none;
+  box-shadow: 0 -16px 56px rgba(0,0,0,0.65);
+  overflow: hidden;
+}
+.explore-body { padding: 0 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 5px 13px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #3D5060;
+  font-size: 12px; font-weight: 600;
+  border-radius: 100px;
+  font-family: 'Inter', sans-serif;
+}
+.chip.active {
+  border-color: #2DD4C8;
+  background: rgba(45,212,200,0.14);
+  color: #2DD4C8;
+}
+
+.ec-card {
+  background: #121F30;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.ec-img {
+  height: 120px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+}
+.ec-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.45));
+}
+.ec-badge {
+  position: absolute;
+  top: 10px; left: 10px;
+  z-index: 1;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.12);
+  font-family: 'Inter', sans-serif;
+}
+.ec-info { padding: 10px 13px 12px; }
+.ec-name { font-size: 14px; font-weight: 700; color: #E8F2FF; margin-bottom: 5px; }
+.ec-desc { font-size: 12px; color: #7A92A8; line-height: 1.45; margin-bottom: 7px; }
+.ec-foot { display: flex; justify-content: space-between; }
+.ec-foot span { font-size: 11px; color: #3D5060; }
+
+/* ── peek variant ── */
+.panel-peek {
+  position: absolute;
+  bottom: 64px; left: 0; right: 0;
+  background: #0D1825;
+  border-radius: 20px 20px 0 0;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-bottom: none;
+  box-shadow: 0 -16px 56px rgba(0,0,0,0.65);
+  height: 44px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.panel-peek::after {
+  content: '';
+  width: 44px; height: 4px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 100px;
+}
+
+/* city input */
+.city-input {
+  width: 100%;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 11px;
+  padding: 10px 13px;
+  color: #E8F2FF;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* title label */
+.section-title {
+  position: absolute;
+  top: 40px; left: 0; right: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.2);
+}
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: Route Builder (open panel) -->
+<div class="frame">
+  <h2>Построение маршрута</h2>
+  <div class="phone">
+    <div class="map-bg"></div>
+    <div class="route-line"></div>
+
+    <!-- panel -->
+    <div class="panel">
+      <div class="handle"></div>
+      <div class="panel-head">
+        <div class="logo">Story<span>Trek</span></div>
+      </div>
+      <div class="panel-body">
+
+        <div class="wp-row">
+          <div class="wp-dot" style="background:#2DD4C8"></div>
+          <div class="wp-input confirmed">Улица Металлургов, 12</div>
+          <div class="wp-icon">⊙</div>
+          <div class="wp-icon">📍</div>
+        </div>
+        <div class="wp-row">
+          <div class="wp-dot" style="background:#FF6B7A"></div>
+          <div class="wp-input confirmed">Соборная горка, Череповец</div>
+          <div class="wp-icon">📍</div>
+        </div>
+
+        <div class="transport-row">
+          <div class="mode-btn active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="4" r="1.5"/><path d="M7 22l2.5-6.5L12 18l2-4 3 8M12 6l-2 5h4l-1 3"/>
+            </svg>
+            Пешком
+          </div>
+          <div class="mode-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/>
+              <path d="M5.5 17.5L9 9l3 2.5L15 9h3M12 9l-1.5-4.5"/><circle cx="15" cy="4.5" r="1"/>
+            </svg>
+            Велосипед
+          </div>
+        </div>
+
+        <div class="route-stats">
+          <div class="stat"><div class="stat-val">3.5 км</div><div class="stat-lbl">расстояние</div></div>
+          <div class="stat"><div class="stat-val">52 мин</div><div class="stat-lbl">пешком</div></div>
+          <div class="clear-btn">✕</div>
+        </div>
+
+        <div class="btn-guide">✦ Создать аудиогид</div>
+
+        <div class="btn-route">▶ Навигация</div>
+
+      </div>
+    </div>
+
+    <!-- FAB -->
+    <div class="fab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </div>
+
+    <!-- nav -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+          <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        <span class="nav-lbl">Маршрут</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+        </svg>
+        <span class="nav-lbl">Маршруты</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="nav-lbl">Сохранённые</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 2: Catalog / Explore panel -->
+<div class="frame">
+  <h2>Готовые маршруты</h2>
+  <div class="phone">
+    <div class="map-bg"></div>
+
+    <!-- explore panel open -->
+    <div class="explore-panel">
+      <div class="handle"></div>
+      <div class="panel-head">
+        <div class="logo">Готовые маршруты</div>
+      </div>
+      <div class="explore-body">
+        <input class="city-input" type="text" value="Череповец" placeholder="Город">
+        <div class="filter-chips">
+          <div class="chip active">Любое</div>
+          <div class="chip">до 3 км</div>
+          <div class="chip">до 5 км</div>
+          <div class="chip">до 10 км</div>
+        </div>
+
+        <!-- card 1 -->
+        <div class="ec-card">
+          <div class="ec-img" style="background:linear-gradient(135deg,#1e3a5f,#2a6496)">
+            <span>⛪</span>
+            <div class="ec-badge">3.5 км · 90 мин</div>
+          </div>
+          <div class="ec-info">
+            <div class="ec-name">Историческое сердце</div>
+            <div class="ec-desc">Соборная горка · Музей Верещагина · набережная Шексны</div>
+            <div class="ec-foot">
+              <span>📍 Череповец</span>
+              <span>🚶 Пешком</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- card 2 -->
+        <div class="ec-card">
+          <div class="ec-img" style="background:linear-gradient(135deg,#1a4a2a,#2d8a3e)">
+            <span>🌊</span>
+            <div class="ec-badge">5 км · 80 мин</div>
+          </div>
+          <div class="ec-info">
+            <div class="ec-name">Вдоль Шексны</div>
+            <div class="ec-desc">Речная набережная · Зашекснинский район · парк у воды</div>
+            <div class="ec-foot">
+              <span>📍 Череповец</span>
+              <span>🚶 Пешком</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FAB -->
+    <div class="fab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </div>
+
+    <!-- nav -->
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+          <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        <span class="nav-lbl">Маршрут</span>
+      </div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+        </svg>
+        <span class="nav-lbl">Маршруты</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="nav-lbl">Сохранённые</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: Map view / peek state -->
+<div class="frame">
+  <h2>Карта + полоска</h2>
+  <div class="phone">
+    <div class="map-bg">
+      <div class="section-title">Карта · Яндекс Maps</div>
+    </div>
+    <div class="route-line"></div>
+
+    <!-- peek strip -->
+    <div class="panel-peek"></div>
+
+    <!-- FAB -->
+    <div class="fab" style="bottom: 122px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </div>
+
+    <!-- nav -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+          <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        <span class="nav-lbl">Маршрут</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+        </svg>
+        <span class="nav-lbl">Маршруты</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="nav-lbl">Сохранённые</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
