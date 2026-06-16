@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StoryTrek — Лого / Лоадер (earbuds)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #0D1117; color: #fff; padding: 40px 24px 80px; text-align: center; }
+h1 { font-size: 26px; font-weight: 800; color: #F0F4FF; margin-bottom: 6px; }
+.sub { color: #5A7090; font-size: 14px; margin-bottom: 44px; line-height:1.5; }
+.row { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; }
+.concept { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.concept-label { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #38BDF8; }
+.concept-desc { font-size: 11px; color: #5A7090; max-width: 300px; line-height: 1.5; }
+
+.phone {
+  width: 300px; height: 560px; background: #F0F9FF; border-radius: 42px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 7px #1A2535, 0 0 0 9px #0D1825, 0 28px 70px rgba(0,0,0,0.7);
+  overflow: hidden; position: relative; cursor: pointer;
+}
+.phone::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 32%, rgba(14,165,233,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 25% 78%, rgba(56,189,248,0.10) 0%, transparent 50%);
+}
+.inner { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.svg-wrap { width: 230px; height: 140px; }
+
+.name { font-size: 27px; font-weight: 800; color: #0C4A6E; letter-spacing: -0.5px; opacity: 0; animation: fade .5s ease var(--nd,2.5s) forwards; }
+.name span { background: linear-gradient(90deg, #0EA5E9, #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.tag { font-size: 11px; color: #5A8AAA; font-weight: 600; letter-spacing: 2px; opacity: 0; animation: fade .4s ease var(--td,2.75s) forwards; }
+.dots { display: flex; gap: 6px; margin-top: 6px; opacity: 0; animation: fade .3s ease var(--dd,2.9s) forwards; }
+.dots span { width: 6px; height: 6px; border-radius: 50%; background: #38BDF8; animation: bounce 1.2s ease-in-out infinite; }
+.dots span:nth-child(2){ animation-delay:.2s; background:#0EA5E9; }
+.dots span:nth-child(3){ animation-delay:.4s; background:#0C4A6E; }
+
+@keyframes fade { to { opacity: 1; } }
+@keyframes bounce { 0%,100%{transform:scale(.6);opacity:.4} 50%{transform:scale(1.1);opacity:1} }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.18)} 100%{transform:scale(1);opacity:1} }
+
+.replay { margin-top: 10px; padding: 9px 22px; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.35); color: #38BDF8; font-size: 12px; font-weight: 600; border-radius: 100px; cursor: pointer; font-family: inherit; }
+.replay:hover { background: rgba(56,189,248,0.2); }
+</style>
+</head>
+<body>
+
+<h1>StoryTrek — Лого (вкладыши + маршрут)</h1>
+<p class="sub">Провод наушников = пунктирный маршрут из точки А в точку Б<br>Нажми на экран — повтор анимации</p>
+
+<div class="row">
+
+  <!-- ════ CONCEPT 1: earbuds hang from the route line ════ -->
+  <div class="concept">
+    <div class="concept-label">Концепт 1 — Наушники свисают с маршрута</div>
+    <div class="phone" id="p1">
+      <div class="inner">
+        <div class="svg-wrap">
+          <svg viewBox="0 0 230 140" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:230px;height:140px;overflow:visible">
+            <!-- Point A pin (left) -->
+            <g style="opacity:0; animation: pop .4s ease .1s forwards; transform-origin:26px 44px">
+              <path d="M 26,44 C 22,38 17,35 17,28 A 9,9 0 1,1 35,28 C 35,35 30,38 26,44 Z" fill="#0EA5E9"/>
+              <circle cx="26" cy="27" r="3.5" fill="#F0F9FF"/>
+            </g>
+            <text x="26" y="60" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle" style="opacity:0; animation: fade .3s ease .3s forwards;">А</text>
+
+            <!-- Dashed route from A → dips down (cable) → up to B -->
+            <path d="M 36,40 C 60,58 80,96 100,96 C 120,96 140,58 164,40"
+              stroke="#38BDF8" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="2.5 9" stroke-dashoffset="320"
+              style="animation: draw 1.1s cubic-bezier(.4,0,.2,1) .45s forwards;"/>
+
+            <!-- Junction where buds split -->
+            <circle cx="100" cy="96" r="3.5" fill="#0EA5E9"
+              style="opacity:0; animation: pop .3s ease 1.4s forwards;"/>
+
+            <!-- Left earbud hanging -->
+            <g style="opacity:0; animation: pop .35s ease 1.55s forwards; transform-origin:84px 116px">
+              <path d="M 100,96 C 94,104 88,108 84,112" stroke="#0EA5E9" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <ellipse cx="82" cy="116" rx="9" ry="11" fill="#0EA5E9" transform="rotate(20 82 116)"/>
+              <ellipse cx="80" cy="111" rx="5" ry="5.5" fill="#BAE6FD" transform="rotate(20 80 111)"/>
+            </g>
+
+            <!-- Right earbud hanging -->
+            <g style="opacity:0; animation: pop .35s ease 1.7s forwards; transform-origin:116px 116px">
+              <path d="M 100,96 C 106,104 112,108 116,112" stroke="#0EA5E9" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <ellipse cx="118" cy="116" rx="9" ry="11" fill="#0EA5E9" transform="rotate(-20 118 116)"/>
+              <ellipse cx="120" cy="111" rx="5" ry="5.5" fill="#BAE6FD" transform="rotate(-20 120 111)"/>
+            </g>
+
+            <!-- Point B pin (right) -->
+            <g style="opacity:0; animation: pop .4s ease 1.55s forwards; transform-origin:174px 44px">
+              <path d="M 174,44 C 170,38 165,35 165,28 A 9,9 0 1,1 183,28 C 183,35 178,38 174,44 Z" fill="#F97316"/>
+              <circle cx="174" cy="27" r="3.5" fill="#F0F9FF"/>
+            </g>
+            <text x="174" y="60" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle" style="opacity:0; animation: fade .3s ease 1.75s forwards;">Б</text>
+          </svg>
+        </div>
+        <div class="name" style="--nd:2.4s">Story<span>Trek</span></div>
+        <div class="tag" style="--td:2.65s">ГОРОДСКИЕ АУДИОМАРШРУТЫ</div>
+        <div class="dots" style="--dd:2.8s"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+    <p class="concept-desc">Маршрут из А провисает дугой как реальный провод, в нижней точке от него отходят два вкладыша, линия поднимается к Б. Точь-в-точь как наушники на референсе.</p>
+  </div>
+
+  <!-- ════ CONCEPT 2: earbuds AT the two endpoints, catenary cable ════ -->
+  <div class="concept">
+    <div class="concept-label">Концепт 2 — Вкладыши на концах А и Б</div>
+    <div class="phone" id="p2">
+      <div class="inner">
+        <div class="svg-wrap">
+          <svg viewBox="0 0 230 140" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:230px;height:140px;overflow:visible">
+            <!-- Left earbud at point A -->
+            <g style="opacity:0; animation: pop .4s ease .15s forwards; transform-origin:34px 52px">
+              <ellipse cx="34" cy="52" rx="11" ry="13" fill="#0EA5E9" transform="rotate(-18 34 52)"/>
+              <ellipse cx="31" cy="46" rx="6" ry="6.5" fill="#BAE6FD" transform="rotate(-18 31 46)"/>
+            </g>
+            <text x="34" y="86" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle" style="opacity:0; animation: fade .3s ease .4s forwards;">А</text>
+
+            <!-- Catenary dashed cable A → B (hanging wire) -->
+            <path d="M 42,62 C 75,108 155,108 188,62"
+              stroke="#38BDF8" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="2.5 9" stroke-dashoffset="300"
+              style="animation: draw 1.0s cubic-bezier(.4,0,.2,1) .6s forwards;"/>
+
+            <!-- mid travel dot moving feel -->
+            <circle cx="115" cy="98" r="3" fill="#0EA5E9"
+              style="opacity:0; animation: pop .3s ease 1.5s forwards;"/>
+
+            <!-- Right earbud at point B -->
+            <g style="opacity:0; animation: pop .4s ease 1.6s forwards; transform-origin:196px 52px">
+              <ellipse cx="196" cy="52" rx="11" ry="13" fill="#0EA5E9" transform="rotate(18 196 52)"/>
+              <ellipse cx="199" cy="46" rx="6" ry="6.5" fill="#BAE6FD" transform="rotate(18 199 46)"/>
+            </g>
+            <text x="196" y="86" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle" style="opacity:0; animation: fade .3s ease 1.8s forwards;">Б</text>
+          </svg>
+        </div>
+        <div class="name" style="--nd:2.3s">Story<span>Trek</span></div>
+        <div class="tag" style="--td:2.55s">ГОРОДСКИЕ АУДИОМАРШРУТЫ</div>
+        <div class="dots" style="--dd:2.7s"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+    <p class="concept-desc">Два вкладыша — это точки А и Б, провод между ними провисает плавной дугой (пунктир = маршрут). Минималистично, идеально для иконки приложения.</p>
+  </div>
+
+</div>
+
+<button class="replay" onclick="replayAll()">↺ Повторить анимацию</button>
+
+<script>
+function replayAll() {
+  ['p1','p2'].forEach(id => {
+    const el = document.getElementById(id);
+    const c = el.cloneNode(true);
+    el.parentNode.replaceChild(c, el);
+    c.id = id;
+    c.addEventListener('click', replayAll);
+  });
+}
+document.querySelectorAll('.phone').forEach(p => p.addEventListener('click', replayAll));
+</script>
+</body>
+</html>
