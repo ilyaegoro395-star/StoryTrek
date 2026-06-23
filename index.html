@@ -1248,15 +1248,65 @@ function makeStoryLayout(n) {
   );
 }
 
+/* project [lat,lng] onto nearest segment of routeCoords; returns the closest
+   point ON the route line + distance, or null if farther than maxDist */
+function snapToRoute(lat, lng, maxDist) {
+  if (routeCoords.length < 2) {
+    if (!routeCoords.length) return null;
+    const d = haversine([lat, lng], routeCoords[0]);
+    return d <= maxDist ? { lat: routeCoords[0][0], lng: routeCoords[0][1], dist: d } : null;
+  }
+  // local equirectangular projection (metres) — accurate for city-scale distances
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos(lat * Math.PI / 180);
+  const toXY = (la, ln) => [ln * mPerDegLng, la * mPerDegLat];
+  const P = toXY(lat, lng);
+
+  let best = null, bestDist = Infinity;
+  for (let i = 0; i < routeCoords.length - 1; i++) {
+    const A = toXY(routeCoords[i][0],   routeCoords[i][1]);
+    const B = toXY(routeCoords[i+1][0], routeCoords[i+1][1]);
+    const ABx = B[0]-A[0], ABy = B[1]-A[1];
+    const ab2 = ABx*ABx + ABy*ABy;
+    let t = ab2 ? ((P[0]-A[0])*ABx + (P[1]-A[1])*ABy) / ab2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = A[0] + t*ABx, cy = A[1] + t*ABy;
+    const dx = P[0]-cx, dy = P[1]-cy;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < bestDist) {
+      bestDist = d;
+      best = { lat: cy / mPerDegLat, lng: cx / mPerDegLng };
+    }
+  }
+  return (best && bestDist <= maxDist) ? { lat: best.lat, lng: best.lng, dist: bestDist } : null;
+}
+
+async function fetchWikiPhoto(wikiTitle) {
+  if (!wikiTitle) return null;
+  try {
+    const r = await fetch(
+      `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle.trim())}`
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.thumbnail ? d.thumbnail.source : null;
+  } catch { return null; }
+}
+
 function drawStoryMarkers(points) {
   clearStoryMarkers();
   points.forEach((pt, i) => {
     const layout = makeStoryLayout(i + 1);
+    const photoHtml = pt.photoUrl
+      ? `<img src="${pt.photoUrl}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">`
+      : '';
     const m = new ymaps.Placemark(
       [pt.lat, pt.lng],
       {
         balloonContentHeader: `<b style="font-family:Inter,sans-serif">${pt.name}</b>`,
-        balloonContentBody:   `<p style="font-family:Inter,sans-serif;font-size:13px;line-height:1.5;margin:6px 0 0">${pt.story}</p>`
+        balloonContentBody:
+          `${photoHtml}` +
+          `<p style="font-family:Inter,sans-serif;font-size:13px;line-height:1.5;margin:0">${pt.story}</p>`
       },
       {
         iconLayout: layout,
@@ -1273,18 +1323,34 @@ function drawStoryMarkers(points) {
 async function geocodeAndDrawStoryPoints(rawPoints) {
   if (!rawPoints || !rawPoints.length) return;
   const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
+  const MAX_DIST = 300; // metres — geocoder slop; marker still snaps onto the route line
+
+  // 1. geocode all points + fetch their Wikipedia photos
   const settled = await Promise.allSettled(
     rawPoints.map(async pt => {
       const r = await fetch(`/api/geocode?q=${encodeURIComponent(pt.address)}${ll}`);
       const items = await r.json();
-      if (!items || !items.length) throw new Error('not found');
-      return { ...pt, lat: items[0].lat, lng: items[0].lng };
+      if (!items || !items.length) throw new Error('not found: ' + pt.address);
+      const photoUrl = await fetchWikiPhoto(pt.wiki || '');
+      return { ...pt, lat: items[0].lat, lng: items[0].lng, photoUrl };
     })
   );
-  const located = settled
-    .filter(r => r.status === 'fulfilled')
-    .map(r => r.value);
-  if (located.length) drawStoryMarkers(located);
+  const geocoded = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+  console.log(`story points: ${geocoded.length}/${rawPoints.length} geocoded`);
+  if (!geocoded.length) return;
+
+  // 2. snap to route; keep snapped position if within range
+  const snapped = geocoded
+    .map(pt => {
+      const s = snapToRoute(pt.lat, pt.lng, MAX_DIST);
+      return s ? { ...pt, lat: s.lat, lng: s.lng } : null;
+    })
+    .filter(Boolean);
+
+  // 3. fallback — if snapping rejected everything, draw at geocoded positions
+  const located = snapped.length ? snapped : geocoded;
+  console.log(`story points: drawing ${located.length} (${snapped.length} snapped to route)`);
+  drawStoryMarkers(located);
 }
 
 btnClear.addEventListener('click', () => {
@@ -1318,7 +1384,7 @@ async function generateGuide() {
         routeDistance,
         transportMode
       }),
-      signal: AbortSignal.timeout(45000)
+      signal: AbortSignal.timeout(58000)
     });
     const data = await r.json();
     if (!data.text) throw new Error(data.error || 'No text');
