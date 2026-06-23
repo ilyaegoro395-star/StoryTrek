@@ -45,7 +45,11 @@ module.exports = async (req, res) => {
   if (q.length < 2) { res.status(200).json([]); return; }
 
   try {
-    const llParam = ll ? `&ll=${encodeURIComponent(ll)}&spn=1,1&prefer_poi=1` : '';
+    /* frontend sends ll=lat,lng; Yandex Suggest expects ll=lng,lat */
+    const llParam = ll ? (() => {
+      const [lat, lng] = ll.split(',').map(Number);
+      return `&ll=${lng},${lat}&spn=0.25,0.25`;
+    })() : '';
     const sugUrl =
       `https://suggest-maps.yandex.ru/v1/suggest` +
       `?apikey=${SUGGEST_KEY}&text=${encodeURIComponent(q)}` +

@@ -114,11 +114,22 @@ ${PEOPLE}
 
 Оформление: абзацы через пустую строку, 3-5 предложений. Только чистый текст — никакого markdown, звёздочек, решёток, списков.`;
 
+  const SYSP_POINTS = `Ты аудиогид StoryTrek. Для данного маршрута определи 4–7 наиболее интересных точек для отображения на карте (как в izi.travel).
+Верни ТОЛЬКО валидный JSON массив — никакого текста до и после:
+[{"name":"Название объекта","address":"Полный адрес для геокодирования, город","story":"1–2 предложения — самый интересный факт об этом месте"}]
+Правила:
+— Только реально существующие объекты
+— address — максимально конкретный: улица + номер дома или название объекта + город
+— story — факт, который удивляет или запоминается
+— Точки расположены от начала к концу маршрута
+— ТОЛЬКО JSON, никакого другого текста`;
+
   const userMsg = `Составь аудиогид для маршрута:\n${routeDescription}`;
 
-  const [part1, part2] = await Promise.all([
+  const [part1, part2, part3] = await Promise.all([
     callGPT(SYSP1, userMsg, API_KEY, FOLDER_ID),
-    callGPT(SYSP2, userMsg, API_KEY, FOLDER_ID)
+    callGPT(SYSP2, userMsg, API_KEY, FOLDER_ID),
+    callGPT(SYSP_POINTS, userMsg, API_KEY, FOLDER_ID)
   ]);
 
   const text = [part1, part2].filter(Boolean).join('\n\n');
@@ -127,5 +138,16 @@ ${PEOPLE}
     return;
   }
 
-  res.status(200).json({ text });
+  let storyPoints = [];
+  try {
+    const raw = (part3 || '').trim()
+      .replace(/^```json?\s*/i, '').replace(/\s*```$/i, '')
+      .replace(/^[^\[]*(\[[\s\S]*\])[^\]]*$/, '$1');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) storyPoints = parsed.slice(0, 8);
+  } catch (e) {
+    console.error('story points parse error:', e.message, (part3 || '').slice(0, 200));
+  }
+
+  res.status(200).json({ text, storyPoints });
 };
