@@ -1378,7 +1378,7 @@ async function buildStoryPoints() {
   const SEARCH_RADIUS = 350;   // m around each probe to look for articles
   const SNAP_MAX      = 300;   // m — discard articles farther than this from the route
   const MIN_GAP       = 250;   // m along route between consecutive points
-  const MAX_POINTS    = 10;
+  const MAX_POINTS    = 12;
 
   // 1. probe Wikipedia along the route
   const probes = sampleAlongRoute(16);
@@ -1412,13 +1412,14 @@ async function buildStoryPoints() {
   });
   const picked = spaced.slice(0, MAX_POINTS);
 
-  // 4. fetch summaries (photo + text), keep only points that have a photo, preload images
+  // 4. fetch summaries; keep any point with a meaningful story (photo optional —
+  //    historical/lost places often have an article but no photo). Preload photos that exist.
   const detailed = (await Promise.all(picked.map(async p => {
     const sum = await wikiSummary(p.title);
-    if (!sum || !sum.photoUrl) return null;     // photo required
-    const img = new Image(); img.src = sum.photoUrl;   // preload → instant on tap
+    if (!sum || (!sum.photoUrl && (sum.extract || '').length < 30)) return null; // need some content
+    if (sum.photoUrl) { const img = new Image(); img.src = sum.photoUrl; } // preload → instant on tap
     return { name: p.title, lat: p.lat, lng: p.lng,
-             story: sum.extract, photoUrl: sum.photoUrl };
+             story: sum.extract, photoUrl: sum.photoUrl || null };
   }))).filter(Boolean);
 
   if (token !== storyBuildToken) return;         // a newer route superseded us
