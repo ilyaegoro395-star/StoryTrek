@@ -1345,7 +1345,7 @@ function drawStoryMarkers(points) {
   points.forEach((pt, i) => {
     const layout = makeStoryLayout(i + 1);
     const photoHtml = pt.photoUrl
-      ? `<img src="${pt.photoUrl}" loading="eager" decoding="sync" style="width:220px;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;background:#E2EEF6">`
+      ? `<img src="${pt.photoUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" loading="eager" decoding="sync" style="width:220px;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;background:#E2EEF6">`
       : '';
     const m = new ymaps.Placemark(
       [pt.lat, pt.lng],
@@ -1417,7 +1417,7 @@ async function buildStoryPoints() {
   const detailed = (await Promise.all(picked.map(async p => {
     const sum = await wikiSummary(p.title);
     if (!sum || (!sum.photoUrl && (sum.extract || '').length < 30)) return null; // need some content
-    if (sum.photoUrl) { const img = new Image(); img.src = sum.photoUrl; } // preload → instant on tap
+    if (sum.photoUrl) { const img = new Image(); img.referrerPolicy = 'no-referrer'; img.crossOrigin = 'anonymous'; img.src = sum.photoUrl; } // preload → instant on tap
     return { name: p.title, lat: p.lat, lng: p.lng,
              story: sum.extract, photoUrl: sum.photoUrl || null };
   }))).filter(Boolean);
