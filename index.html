@@ -610,6 +610,8 @@ let mapPickIdx    = -1;
 let drag          = null;
 let transportMode = 'foot';
 let mapPickTimer  = null;
+let myCity        = '';
+let storyMarkers  = [];
 
 /* ─── DOM ─── */
 const btnRoute    = document.getElementById('btn-route');
@@ -664,12 +666,28 @@ async function geocodeCenter(lat, lng) {
 }
 
 /* ─── geolocation ─── */
+async function detectCity(lat, lng) {
+  try {
+    const r = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.text) {
+      /* Russian address format: "Россия, Регион, Город, улица, дом" */
+      const parts = data.text.split(', ');
+      /* city is typically 3rd part (index 2) — skip country + region */
+      if (parts.length >= 3) myCity = parts[2];
+    }
+  } catch {}
+}
+
 function startPosWatch() {
   if (!navigator.geolocation) return;
   posWatch = navigator.geolocation.watchPosition(
     pos => {
+      const isFirst = !myPos;
       myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setMyMarker([myPos.lat, myPos.lng]);
+      if (isFirst) detectCity(myPos.lat, myPos.lng);
       if (navActive && !navPaused) onNavPosition(myPos);
     },
     () => {},
@@ -726,10 +744,8 @@ const NAV_H        = 64;
 function updateFab() {
   const fab = document.getElementById('fab-locate');
   let panelH = 0;
-  if (card.classList.contains('open'))           panelH = card.offsetHeight;
-  else if (card.classList.contains('peek'))      panelH = 44;
-  else if (explorePanel.classList.contains('open'))  panelH = explorePanel.offsetHeight;
-  else if (explorePanel.classList.contains('peek'))  panelH = 44;
+  if (card.classList.contains('open'))              panelH = card.offsetHeight;
+  else if (explorePanel.classList.contains('open')) panelH = explorePanel.offsetHeight;
   fab.style.bottom = (NAV_H + panelH + 14) + 'px';
 }
 new ResizeObserver(updateFab).observe(card);
@@ -759,9 +775,16 @@ function openPanel(which) {
   updateFab();
 }
 
+function hidePanel(which) {
+  const el = which === 'route' ? card : explorePanel;
+  el.classList.remove('open', 'peek');
+  document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.remove('active');
+  updateFab();
+}
+
 function togglePanel(which) {
   const el = which === 'route' ? card : explorePanel;
-  if (el.classList.contains('open')) peekPanel(which);
+  if (el.classList.contains('open')) hidePanel(which);
   else openPanel(which);
 }
 
@@ -793,7 +816,7 @@ function addPanelSwipe(panel, handleEl, which) {
     if (!moved) {
       togglePanel(which);
     } else if (startOpen && dy > 80) {
-      peekPanel(which);
+      hidePanel(which);
     } else if (!startOpen && dy < -60) {
       openPanel(which);
     }
@@ -806,21 +829,18 @@ addPanelSwipe(card, document.getElementById('sheet-handle'), 'route');
 addPanelSwipe(explorePanel, document.getElementById('explore-handle'), 'explore');
 
 document.getElementById('nav-route').addEventListener('click', () => {
-  const el = card;
-  if (el.classList.contains('open')) peekPanel('route');
+  if (card.classList.contains('open')) hidePanel('route');
   else openPanel('route');
 });
 document.getElementById('nav-explore').addEventListener('click', () => {
-  const el = explorePanel;
-  if (el.classList.contains('open')) peekPanel('explore');
+  if (explorePanel.classList.contains('open')) hidePanel('explore');
   else openPanel('explore');
 });
 document.getElementById('nav-saved').addEventListener('click', () => {
   setStatus('Сохранённые маршруты — скоро', 'info');
 });
 
-/* при старте показываем полоску маршрутной панели */
-peekPanel('route');
+/* panels start fully hidden — open on nav icon tap */
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
@@ -837,8 +857,8 @@ function cleanText(s) {
 
 /* ─── waypoint rendering ─── */
 function wpDotColor(i, n) {
-  if (i === 0) return '#2DD4C8';
-  if (i === n - 1) return '#FF6B7A';
+  if (i === 0) return '#0EA5E9';
+  if (i === n - 1) return '#F97316';
   return '#6B88A0';
 }
 
@@ -1008,7 +1028,7 @@ function cancelMapPick() {
   clearTimeout(mapPickTimer);
   document.getElementById('map-crosshair').classList.remove('visible');
   document.getElementById('map-pick-panel').classList.remove('visible');
-  peekPanel('route');
+  openPanel('route');
   document.querySelectorAll('.btn-map-pick').forEach(btn => btn.classList.remove('active'));
 }
 
@@ -1030,7 +1050,9 @@ document.getElementById('mpp-done').addEventListener('click', () => {
 async function fetchSug(i, val) {
   try {
     const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
-    const res = await fetch(`/api/geocode?q=${encodeURIComponent(val)}${ll}`);
+    /* bias toward current city: if query has no comma and city is known, append it */
+    const q = (myCity && !val.includes(',')) ? `${val}, ${myCity}` : val;
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}${ll}`);
     if (!res.ok) { closeSug(i); return; }
     const items = await res.json();
     if (!items.length) { closeSug(i); return; }
@@ -1187,13 +1209,13 @@ function drawRoute(coords, pts) {
   clearRoute();
   routeLine = new ymaps.GeoObject(
     { geometry: { type: 'LineString', coordinates: coords } },
-    { geodesic: false, strokeWidth: 5, strokeColor: '#2DD4C8', strokeOpacity: 0.92 }
+    { geodesic: false, strokeWidth: 5, strokeColor: '#0EA5E9', strokeOpacity: 0.92 }
   );
   ymap.geoObjects.add(routeLine);
   pts.forEach((p, i) => {
     const m = new ymaps.Placemark([p.lat, p.lng], {}, {
       preset: 'islands#circleIcon',
-      iconColor: i === 0 ? '#2DD4C8' : '#FF6B7A'
+      iconColor: i === 0 ? '#0EA5E9' : '#F97316'
     });
     ymap.geoObjects.add(m);
     routeMarkers.push(m);
@@ -1207,6 +1229,62 @@ function clearRoute() {
   if (routeLine) { ymap.geoObjects.remove(routeLine); routeLine = null; }
   routeMarkers.forEach(m => ymap.geoObjects.remove(m));
   routeMarkers = [];
+  clearStoryMarkers();
+}
+
+/* ─── story point markers (izi.travel style) ─── */
+function clearStoryMarkers() {
+  storyMarkers.forEach(m => ymap.geoObjects.remove(m));
+  storyMarkers = [];
+}
+
+function makeStoryLayout(n) {
+  return ymaps.templateLayoutFactory.createClass(
+    `<div style="background:#0EA5E9;color:#fff;width:28px;height:28px;border-radius:50%;` +
+    `display:flex;align-items:center;justify-content:center;` +
+    `font-family:Inter,sans-serif;font-size:11px;font-weight:700;` +
+    `border:2.5px solid #fff;box-shadow:0 2px 10px rgba(14,165,233,0.45);` +
+    `cursor:pointer;transform:translate(-50%,-50%)">${n}</div>`
+  );
+}
+
+function drawStoryMarkers(points) {
+  clearStoryMarkers();
+  points.forEach((pt, i) => {
+    const layout = makeStoryLayout(i + 1);
+    const m = new ymaps.Placemark(
+      [pt.lat, pt.lng],
+      {
+        balloonContentHeader: `<b style="font-family:Inter,sans-serif">${pt.name}</b>`,
+        balloonContentBody:   `<p style="font-family:Inter,sans-serif;font-size:13px;line-height:1.5;margin:6px 0 0">${pt.story}</p>`
+      },
+      {
+        iconLayout: layout,
+        iconShape:  { type: 'Circle', coordinates: [0, 0], radius: 14 },
+        iconImageSize:   [28, 28],
+        iconImageOffset: [-14, -14]
+      }
+    );
+    ymap.geoObjects.add(m);
+    storyMarkers.push(m);
+  });
+}
+
+async function geocodeAndDrawStoryPoints(rawPoints) {
+  if (!rawPoints || !rawPoints.length) return;
+  const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
+  const settled = await Promise.allSettled(
+    rawPoints.map(async pt => {
+      const r = await fetch(`/api/geocode?q=${encodeURIComponent(pt.address)}${ll}`);
+      const items = await r.json();
+      if (!items || !items.length) throw new Error('not found');
+      return { ...pt, lat: items[0].lat, lng: items[0].lng };
+    })
+  );
+  const located = settled
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+  if (located.length) drawStoryMarkers(located);
 }
 
 btnClear.addEventListener('click', () => {
@@ -1220,6 +1298,7 @@ btnClear.addEventListener('click', () => {
   guideText.innerHTML = '';
   stopNav(); setStatus('');
   renderWaypointList();
+  updateFab();
 });
 
 /* ─── guide generation ─── */
@@ -1243,6 +1322,10 @@ async function generateGuide() {
     });
     const data = await r.json();
     if (!data.text) throw new Error(data.error || 'No text');
+    /* draw story points on map while guide loads */
+    if (data.storyPoints && data.storyPoints.length) {
+      geocodeAndDrawStoryPoints(data.storyPoints);
+    }
     // Split on any paragraph break; further split long segments by sentence
     const rawSegs = data.text.split(/\n{2,}/).map(s => cleanText(s)).filter(Boolean);
     segments = rawSegs.flatMap(seg => {
