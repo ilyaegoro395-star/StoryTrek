@@ -612,6 +612,9 @@ let transportMode = 'foot';
 let mapPickTimer  = null;
 let myCity        = '';
 let storyMarkers  = [];
+let currentStoryPoints = [];   // {name, lat, lng, story, photoUrl} placed on route
+let storyBuildToken = 0;       // guards against stale async builds
+let storyBuildPromise = null;  // resolves when the current route's points are ready
 
 /* ─── DOM ─── */
 const btnRoute    = document.getElementById('btn-route');
@@ -1223,6 +1226,9 @@ function drawRoute(coords, pts) {
   const lats = coords.map(c => c[0]), lngs = coords.map(c => c[1]);
   ymap.setBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
     { checkZoomRange: true, duration: 600, margin: 60 });
+
+  /* story points form together with the route */
+  storyBuildPromise = buildStoryPoints();
 }
 
 function clearRoute() {
@@ -1281,16 +1287,57 @@ function snapToRoute(lat, lng, maxDist) {
   return (best && bestDist <= maxDist) ? { lat: best.lat, lng: best.lng, dist: bestDist } : null;
 }
 
-async function fetchWikiPhoto(wikiTitle) {
-  if (!wikiTitle) return null;
+/* nearest Wikipedia (ru) articles to a coordinate — CORS via origin=* */
+async function wikiGeoSearch(lat, lng, radius, limit) {
+  try {
+    const u = `https://ru.wikipedia.org/w/api.php?action=query&list=geosearch` +
+      `&gscoord=${lat}%7C${lng}&gsradius=${radius}&gslimit=${limit}&format=json&origin=*`;
+    const r = await fetch(u);
+    const d = await r.json();
+    return (d.query?.geosearch || []).map(g =>
+      ({ pageid: g.pageid, title: g.title, lat: g.lat, lng: g.lon }));
+  } catch { return []; }
+}
+
+/* article summary: photo + short extract */
+async function wikiSummary(title) {
   try {
     const r = await fetch(
-      `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle.trim())}`
-    );
+      `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
     if (!r.ok) return null;
     const d = await r.json();
-    return d.thumbnail ? d.thumbnail.source : null;
+    return {
+      photoUrl: d.thumbnail ? d.thumbnail.source.replace(/\/\d+px-/, '/440px-') : null,
+      extract:  d.extract || ''
+    };
   } catch { return null; }
+}
+
+/* index of the route vertex nearest to a coordinate — used to order points along the path */
+function routeOrderIndex(lat, lng) {
+  let best = 0, bestDist = Infinity;
+  routeCoords.forEach((c, i) => {
+    const d = haversine([lat, lng], c);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+/* sample n coordinates evenly along the route by cumulative distance */
+function sampleAlongRoute(n) {
+  if (routeCoords.length <= n) return routeCoords.slice();
+  const cum = [0];
+  for (let i = 1; i < routeCoords.length; i++)
+    cum[i] = cum[i-1] + haversine(routeCoords[i-1], routeCoords[i]);
+  const total = cum[cum.length - 1];
+  const out = [];
+  for (let s = 0; s < n; s++) {
+    const target = total * (s + 0.5) / n;   // centre of each slice
+    let i = cum.findIndex(d => d >= target);
+    if (i < 0) i = routeCoords.length - 1;
+    out.push(routeCoords[i]);
+  }
+  return out;
 }
 
 function drawStoryMarkers(points) {
@@ -1298,7 +1345,7 @@ function drawStoryMarkers(points) {
   points.forEach((pt, i) => {
     const layout = makeStoryLayout(i + 1);
     const photoHtml = pt.photoUrl
-      ? `<img src="${pt.photoUrl}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">`
+      ? `<img src="${pt.photoUrl}" loading="eager" decoding="sync" style="width:220px;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;background:#E2EEF6">`
       : '';
     const m = new ymaps.Placemark(
       [pt.lat, pt.lng],
@@ -1320,37 +1367,64 @@ function drawStoryMarkers(points) {
   });
 }
 
-async function geocodeAndDrawStoryPoints(rawPoints) {
-  if (!rawPoints || !rawPoints.length) return;
-  const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
-  const MAX_DIST = 300; // metres — geocoder slop; marker still snaps onto the route line
+/* Build story points FROM the actual route: walk the polyline, find real
+   Wikipedia objects along it, snap them onto the line, preload their photos.
+   Guarantees: points sit on the route, every shown point has a photo. */
+async function buildStoryPoints() {
+  if (routeCoords.length < 2) return;
+  const token = ++storyBuildToken;     // invalidate any earlier in-flight build
+  currentStoryPoints = [];
 
-  // 1. geocode all points + fetch their Wikipedia photos
-  const settled = await Promise.allSettled(
-    rawPoints.map(async pt => {
-      const r = await fetch(`/api/geocode?q=${encodeURIComponent(pt.address)}${ll}`);
-      const items = await r.json();
-      if (!items || !items.length) throw new Error('not found: ' + pt.address);
-      const photoUrl = await fetchWikiPhoto(pt.wiki || '');
-      return { ...pt, lat: items[0].lat, lng: items[0].lng, photoUrl };
-    })
+  const SEARCH_RADIUS = 350;   // m around each probe to look for articles
+  const SNAP_MAX      = 300;   // m — discard articles farther than this from the route
+  const MIN_GAP       = 250;   // m along route between consecutive points
+  const MAX_POINTS    = 10;
+
+  // 1. probe Wikipedia along the route
+  const probes = sampleAlongRoute(16);
+  const seen = new Set();
+  const candidates = [];
+  const batches = await Promise.all(
+    probes.map(([lat, lng]) => wikiGeoSearch(lat, lng, SEARCH_RADIUS, 4))
   );
-  const geocoded = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
-  console.log(`story points: ${geocoded.length}/${rawPoints.length} geocoded`);
-  if (!geocoded.length) return;
+  if (token !== storyBuildToken) return;
+  batches.flat().forEach(a => {
+    if (seen.has(a.pageid)) return;
+    seen.add(a.pageid);
+    candidates.push(a);
+  });
 
-  // 2. snap to route; keep snapped position if within range
-  const snapped = geocoded
-    .map(pt => {
-      const s = snapToRoute(pt.lat, pt.lng, MAX_DIST);
-      return s ? { ...pt, lat: s.lat, lng: s.lng } : null;
-    })
-    .filter(Boolean);
+  // 2. snap to route, keep those close enough, order along the path
+  const onRoute = [];
+  candidates.forEach(a => {
+    const s = snapToRoute(a.lat, a.lng, SNAP_MAX);
+    if (s) onRoute.push({ title: a.title, lat: s.lat, lng: s.lng,
+                          order: routeOrderIndex(a.lat, a.lng) });
+  });
+  onRoute.sort((x, y) => x.order - y.order);
 
-  // 3. fallback — if snapping rejected everything, draw at geocoded positions
-  const located = snapped.length ? snapped : geocoded;
-  console.log(`story points: drawing ${located.length} (${snapped.length} snapped to route)`);
-  drawStoryMarkers(located);
+  // 3. thin out points that are too close together
+  const spaced = [];
+  onRoute.forEach(p => {
+    const last = spaced[spaced.length - 1];
+    if (!last || haversine([last.lat, last.lng], [p.lat, p.lng]) >= MIN_GAP)
+      spaced.push(p);
+  });
+  const picked = spaced.slice(0, MAX_POINTS);
+
+  // 4. fetch summaries (photo + text), keep only points that have a photo, preload images
+  const detailed = (await Promise.all(picked.map(async p => {
+    const sum = await wikiSummary(p.title);
+    if (!sum || !sum.photoUrl) return null;     // photo required
+    const img = new Image(); img.src = sum.photoUrl;   // preload → instant on tap
+    return { name: p.title, lat: p.lat, lng: p.lng,
+             story: sum.extract, photoUrl: sum.photoUrl };
+  }))).filter(Boolean);
+
+  if (token !== storyBuildToken) return;         // a newer route superseded us
+  console.log(`story points: ${candidates.length} candidates → ${detailed.length} on route with photos`);
+  currentStoryPoints = detailed;
+  drawStoryMarkers(detailed);
 }
 
 btnClear.addEventListener('click', () => {
@@ -1374,6 +1448,8 @@ async function generateGuide() {
   btnGuide.disabled = true;
   setStatus('Создаём аудиогид…', 'info');
   try {
+    /* make sure route's real objects are ready — the guide is built from them */
+    if (storyBuildPromise) { try { await storyBuildPromise; } catch {} }
     const r = await fetch('/api/generate-guide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1382,16 +1458,14 @@ async function generateGuide() {
           i === 0 ? `Начало: «${p.text}»` : i === a.length-1 ? `Конец: «${p.text}»` : `Промежуточная точка: «${p.text}»`
         ).join('\n'),
         routeDistance,
-        transportMode
+        transportMode,
+        // real objects found along the route + their Wikipedia facts — the guide is built from these
+        storyPoints: currentStoryPoints.map(p => ({ name: p.name, facts: p.story }))
       }),
       signal: AbortSignal.timeout(58000)
     });
     const data = await r.json();
     if (!data.text) throw new Error(data.error || 'No text');
-    /* draw story points on map while guide loads */
-    if (data.storyPoints && data.storyPoints.length) {
-      geocodeAndDrawStoryPoints(data.storyPoints);
-    }
     // Split on any paragraph break; further split long segments by sentence
     const rawSegs = data.text.split(/\n{2,}/).map(s => cleanText(s)).filter(Boolean);
     segments = rawSegs.flatMap(seg => {
