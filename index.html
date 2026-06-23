@@ -1248,15 +1248,44 @@ function makeStoryLayout(n) {
   );
 }
 
+/* snap [lat,lng] to nearest point on routeCoords; returns snapped coords or null if > maxDist */
+function snapToRoute(lat, lng, maxDist) {
+  if (!routeCoords.length) return null;
+  let best = null, bestDist = Infinity;
+  const pt = [lat, lng];
+  routeCoords.forEach(coord => {
+    const d = haversine(pt, coord);
+    if (d < bestDist) { bestDist = d; best = coord; }
+  });
+  return bestDist <= maxDist ? { lat: best[0], lng: best[1], dist: bestDist } : null;
+}
+
+async function fetchWikiPhoto(wikiTitle) {
+  if (!wikiTitle) return null;
+  try {
+    const r = await fetch(
+      `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle.trim())}`
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.thumbnail ? d.thumbnail.source : null;
+  } catch { return null; }
+}
+
 function drawStoryMarkers(points) {
   clearStoryMarkers();
   points.forEach((pt, i) => {
     const layout = makeStoryLayout(i + 1);
+    const photoHtml = pt.photoUrl
+      ? `<img src="${pt.photoUrl}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block">`
+      : '';
     const m = new ymaps.Placemark(
       [pt.lat, pt.lng],
       {
         balloonContentHeader: `<b style="font-family:Inter,sans-serif">${pt.name}</b>`,
-        balloonContentBody:   `<p style="font-family:Inter,sans-serif;font-size:13px;line-height:1.5;margin:6px 0 0">${pt.story}</p>`
+        balloonContentBody:
+          `${photoHtml}` +
+          `<p style="font-family:Inter,sans-serif;font-size:13px;line-height:1.5;margin:0">${pt.story}</p>`
       },
       {
         iconLayout: layout,
@@ -1273,14 +1302,25 @@ function drawStoryMarkers(points) {
 async function geocodeAndDrawStoryPoints(rawPoints) {
   if (!rawPoints || !rawPoints.length) return;
   const ll = myPos ? `&ll=${myPos.lat},${myPos.lng}` : '';
+  const MAX_DIST = 150; // metres from route
+
   const settled = await Promise.allSettled(
     rawPoints.map(async pt => {
       const r = await fetch(`/api/geocode?q=${encodeURIComponent(pt.address)}${ll}`);
       const items = await r.json();
       if (!items || !items.length) throw new Error('not found');
-      return { ...pt, lat: items[0].lat, lng: items[0].lng };
+      const { lat, lng } = items[0];
+
+      // snap to nearest route point; discard if too far
+      const snapped = snapToRoute(lat, lng, MAX_DIST);
+      if (!snapped) throw new Error('too far from route');
+
+      // fetch Wikipedia photo in parallel with snapping
+      const photoUrl = await fetchWikiPhoto(pt.wiki || '');
+      return { ...pt, lat: snapped.lat, lng: snapped.lng, photoUrl };
     })
   );
+
   const located = settled
     .filter(r => r.status === 'fulfilled')
     .map(r => r.value);

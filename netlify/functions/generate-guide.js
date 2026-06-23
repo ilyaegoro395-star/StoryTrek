@@ -1,10 +1,10 @@
 const https = require('https');
 
-function callGPT(systemText, userText, apiKey, folderId) {
+function callGPT(systemText, userText, apiKey, folderId, maxTokens = '8000') {
   return new Promise((resolve) => {
     const body = JSON.stringify({
       modelUri: `gpt://${folderId}/yandexgpt`,
-      completionOptions: { stream: false, temperature: 0.6, maxTokens: '8000' },
+      completionOptions: { stream: false, temperature: 0.6, maxTokens },
       messages: [
         { role: 'system', text: systemText },
         { role: 'user',   text: userText }
@@ -80,6 +80,44 @@ module.exports = async (req, res) => {
 — Только реально существовавших людей, о которых есть достоверные данные
 — Привязывай рассказ к конкретным местам на маршруте если возможно, иначе — к общей истории города`;
 
+  const SYSP_POINTS = `Ты аудиогид StoryTrek. Для данного маршрута найди 8–12 реально существующих исторических объектов для отображения на карте.
+
+ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
+— Только объекты с историческим, архитектурным или культурным значением: памятники, монументы, церкви, соборы, храмы, монастыри, усадьбы, исторические здания дореволюционной постройки, объекты из реестра культурного наследия
+— СТРОГО ЗАПРЕЩЕНО включать: торговые центры, современные офисные здания, обычные жилые дома, рестораны, магазины, развлекательные заведения
+— Только объекты, расположенные на маршруте или в радиусе 100 метров от него
+— Только реально существующие объекты, о которых есть данные в Википедии или краеведческих источниках
+— Расположи точки в порядке от начала к концу маршрута
+
+Для поля wiki: укажи точное название статьи в русской Википедии (ru.wikipedia.org) — это будет использовано для получения фото. Если статьи нет — оставь пустую строку.
+
+Верни ТОЛЬКО валидный JSON массив — никакого текста до и после:
+[{"name":"Название объекта","address":"Полный адрес: улица + номер или название + город","story":"1–2 предложения — самый интересный исторический факт","wiki":"Точное название статьи в русской Википедии или пустая строка"}]
+
+ТОЛЬКО JSON, никакого другого текста.`;
+
+  const userMsg = `Составь аудиогид для маршрута:\n${routeDescription}`;
+
+  // Step 1: generate story points first
+  const pointsRaw = await callGPT(SYSP_POINTS, userMsg, API_KEY, FOLDER_ID, '3000');
+
+  let storyPoints = [];
+  try {
+    const raw = (pointsRaw || '').trim()
+      .replace(/^```json?\s*/i, '').replace(/\s*```$/i, '')
+      .replace(/^[^\[]*(\[[\s\S]*\])[^\]]*$/, '$1');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) storyPoints = parsed.slice(0, 12);
+  } catch (e) {
+    console.error('story points parse error:', e.message, (pointsRaw || '').slice(0, 200));
+  }
+
+  // Build a compact list of story points for guide context
+  const pointsList = storyPoints.length
+    ? '\n\nОТМЕЧЕННЫЕ ТОЧКИ НА КАРТЕ (упомяни каждую в аудиогиде):\n' +
+      storyPoints.map((p, i) => `${i+1}. ${p.name} — ${p.story}`).join('\n')
+    : '';
+
   const SYSP1 = `Ты аудиогид StoryTrek для прогулок по городам России.
 Режим: ${modeLbl}. Длина маршрута: ${routeDistance} м. Один сегмент = ~${segDist} м. Первая часть: ${half} сегментов.
 ${ACCURACY}
@@ -95,6 +133,7 @@ ${PEOPLE}
 — Визуальная идентификация: цвет, этажность, архитектурный стиль — чтобы слушатель узнал место прямо сейчас
 — История места: только достоверное. Если нет данных — что было здесь ДО, или стиль и эпоха застройки
 — Известные люди города/края — уместно вплети рассказ об одном-двух на протяжении маршрута
+— Когда маршрут проходит мимо отмеченных точек на карте — обязательно упомяни их по имени
 
 Не упоминай конечную точку. Заверши на ~${half * segDist} м от старта.
 
@@ -111,42 +150,22 @@ ${PEOPLE}
 — История только достоверная; иначе — что было ДО, стиль эпохи
 — Можно упомянуть ещё одного известного человека города, если не был упомянут в первой части
 — Финальный сегмент — история конечной точки как кульминация прогулки
+— Когда маршрут проходит мимо отмеченных точек на карте — обязательно упомяни их по имени
 
 Оформление: абзацы через пустую строку, 3-5 предложений. Только чистый текст — никакого markdown, звёздочек, решёток, списков.`;
 
-  const SYSP_POINTS = `Ты аудиогид StoryTrek. Для данного маршрута определи 4–7 наиболее интересных точек для отображения на карте (как в izi.travel).
-Верни ТОЛЬКО валидный JSON массив — никакого текста до и после:
-[{"name":"Название объекта","address":"Полный адрес для геокодирования, город","story":"1–2 предложения — самый интересный факт об этом месте"}]
-Правила:
-— Только реально существующие объекты
-— address — максимально конкретный: улица + номер дома или название объекта + город
-— story — факт, который удивляет или запоминается
-— Точки расположены от начала к концу маршрута
-— ТОЛЬКО JSON, никакого другого текста`;
+  // Step 2: generate both guide parts with story points context
+  const userMsgWithPoints = userMsg + pointsList;
 
-  const userMsg = `Составь аудиогид для маршрута:\n${routeDescription}`;
-
-  const [part1, part2, part3] = await Promise.all([
-    callGPT(SYSP1, userMsg, API_KEY, FOLDER_ID),
-    callGPT(SYSP2, userMsg, API_KEY, FOLDER_ID),
-    callGPT(SYSP_POINTS, userMsg, API_KEY, FOLDER_ID)
+  const [part1, part2] = await Promise.all([
+    callGPT(SYSP1, userMsgWithPoints, API_KEY, FOLDER_ID),
+    callGPT(SYSP2, userMsgWithPoints, API_KEY, FOLDER_ID)
   ]);
 
   const text = [part1, part2].filter(Boolean).join('\n\n');
   if (!text) {
     res.status(500).json({ error: 'Both GPT calls returned empty' });
     return;
-  }
-
-  let storyPoints = [];
-  try {
-    const raw = (part3 || '').trim()
-      .replace(/^```json?\s*/i, '').replace(/\s*```$/i, '')
-      .replace(/^[^\[]*(\[[\s\S]*\])[^\]]*$/, '$1');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) storyPoints = parsed.slice(0, 8);
-  } catch (e) {
-    console.error('story points parse error:', e.message, (part3 || '').slice(0, 200));
   }
 
   res.status(200).json({ text, storyPoints });
