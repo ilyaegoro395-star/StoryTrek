@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StoryTrek — Лого v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #0D1117; color: #fff; padding: 40px 24px 80px; text-align: center; }
+h1 { font-size: 24px; font-weight: 800; color: #F0F4FF; margin-bottom: 6px; }
+.sub { color: #5A7090; font-size: 14px; margin-bottom: 44px; line-height: 1.5; }
+
+.phone {
+  width: 300px; height: 560px; background: #F0F9FF; border-radius: 42px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 7px #1A2535, 0 0 0 9px #0D1825, 0 28px 70px rgba(0,0,0,0.7);
+  overflow: hidden; position: relative; cursor: pointer; margin: 0 auto;
+}
+.phone::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 32%, rgba(14,165,233,0.13) 0%, transparent 55%),
+    radial-gradient(ellipse at 25% 78%, rgba(56,189,248,0.10) 0%, transparent 50%);
+}
+.inner { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.svg-wrap { width: 270px; height: 155px; }
+
+.name { font-size: 28px; font-weight: 800; color: #0C4A6E; letter-spacing: -0.5px; opacity: 0; animation: fade .5s ease var(--nd, 2.8s) forwards; }
+.name span { background: linear-gradient(90deg, #0EA5E9, #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.tag { font-size: 11px; color: #5A8AAA; font-weight: 600; letter-spacing: 2px; opacity: 0; animation: fade .4s ease var(--td, 3.05s) forwards; }
+.dots { display: flex; gap: 6px; margin-top: 4px; opacity: 0; animation: fade .3s ease var(--dd, 3.2s) forwards; }
+.dots span { width: 6px; height: 6px; border-radius: 50%; background: #38BDF8; animation: bounce 1.2s ease-in-out infinite; }
+.dots span:nth-child(2) { animation-delay: .2s; background: #0EA5E9; }
+.dots span:nth-child(3) { animation-delay: .4s; background: #0C4A6E; }
+
+@keyframes fade   { to { opacity: 1; } }
+@keyframes bounce { 0%,100%{transform:scale(.6);opacity:.4} 50%{transform:scale(1.1);opacity:1} }
+@keyframes draw   { to { stroke-dashoffset: 0; } }
+@keyframes pop    { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+
+.replay { margin-top: 20px; padding: 9px 22px; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.35); color: #38BDF8; font-size: 12px; font-weight: 600; border-radius: 100px; cursor: pointer; font-family: inherit; }
+.replay:hover { background: rgba(56,189,248,0.2); }
+</style>
+</head>
+<body>
+
+<h1>StoryTrek — Лого v3</h1>
+<p class="sub">Вкладыши с проводом = прерывистый маршрут из А в Б<br>Нажми на экран — повтор анимации</p>
+
+<div class="phone" id="p1">
+  <div class="inner">
+    <div class="svg-wrap">
+
+      <!--
+        ANATOMY:
+        • Two in-ear earbuds facing OUTWARD (nozzles left/right)
+        • Nozzle = short tube + dark opening ring (most recognisable feature)
+        • Route wire = dashed catenary connecting the backs of both bodies
+        • Map pins А / Б sit above each bud
+      -->
+      <svg viewBox="0 0 270 148" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="width:270px;height:148px;overflow:visible">
+        <defs>
+          <linearGradient id="gL" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#60CFFF"/>
+            <stop offset="100%" stop-color="#0EA5E9"/>
+          </linearGradient>
+          <linearGradient id="gR" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#60CFFF"/>
+            <stop offset="100%" stop-color="#0EA5E9"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- ═══ PIN А ═══ -->
+        <g style="opacity:0;animation:pop .35s ease 0s forwards" transform-origin="68 28">
+          <path d="M68,30 C64,24 59,21 59,15 A9,9 0 1,1 77,15 C77,21 72,24 68,30Z" fill="#0EA5E9"/>
+          <circle cx="68" cy="15" r="3.5" fill="#F0F9FF"/>
+        </g>
+        <text x="68" y="45" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle"
+              style="opacity:0;animation:fade .3s ease .25s forwards">А</text>
+
+        <!-- ═══ LEFT EARBUD ═══
+             Body centre (68, 88). Nozzle points LEFT (x decreasing).
+             Cable-exit on RIGHT side of body → route wire starts there.
+        -->
+        <g style="opacity:0;animation:pop .4s ease .1s forwards" transform-origin="68 88">
+
+          <!-- ── housing body ── -->
+          <ellipse cx="68" cy="88" rx="24" ry="29" fill="url(#gL)"/>
+          <!-- depth bevel ring -->
+          <ellipse cx="67" cy="87" rx="17" ry="21" fill="#0879B9" opacity="0.38"/>
+          <!-- face plate -->
+          <ellipse cx="67" cy="86" rx="12" ry="15" fill="#1AAEE8" opacity="0.55"/>
+          <!-- speaker grille — three concentric rings -->
+          <circle cx="67" cy="86" r="10" fill="none" stroke="#BAE6FD" stroke-width="1.2" opacity="0.55"/>
+          <circle cx="67" cy="86" r="6"  fill="#55D4F8" opacity="0.5"/>
+          <circle cx="67" cy="86" r="3"  fill="#BAE6FD" opacity="0.85"/>
+          <circle cx="67" cy="86" r="1.2" fill="#F0F9FF"/>
+
+          <!-- ── NOZZLE pointing LEFT ──
+               Short rounded tube exiting from the LEFT face of the body.
+               The dark circle at the tip = ear-canal opening (key recognition cue).
+          -->
+          <!-- tube -->
+          <rect x="18" y="81" width="32" height="13" rx="6.5" fill="#0EA5E9"/>
+          <!-- top highlight stripe for 3-D feel -->
+          <rect x="18" y="81" width="32" height="5"  rx="3"   fill="#38BDF8" opacity="0.45"/>
+          <!-- tip: outer dark ring (the opening that enters the ear) -->
+          <circle cx="21" cy="87.5" r="7"   fill="#06304D" opacity="0.75"/>
+          <!-- tip: inner bore -->
+          <circle cx="21" cy="87.5" r="4.5" fill="#0A5F8A"/>
+          <circle cx="21" cy="87.5" r="2"   fill="#1A9CD4" opacity="0.6"/>
+        </g>
+
+        <!-- ═══ ROUTE WIRE (dashed catenary) ═══
+             Connects RIGHT side of left body (x≈92) to LEFT side of right body (x≈178).
+             Arc sags to y≈132 — looks like a cable hanging between two earbuds.
+        -->
+        <path d="M92,88 C92,132 178,132 178,88"
+              stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"
+              stroke-dasharray="3 9" stroke-dashoffset="240"
+              style="animation:draw 1.05s cubic-bezier(.4,0,.2,1) .6s forwards"
+              filter="url(#glow)"/>
+
+        <!-- mid-point junction dot that pops after wire finishes drawing -->
+        <circle cx="135" cy="122" r="4" fill="#0EA5E9"
+                style="opacity:0;animation:pop .3s ease 1.55s forwards"/>
+
+        <!-- ═══ RIGHT EARBUD (mirror of left) ═══ -->
+        <g style="opacity:0;animation:pop .4s ease 1.6s forwards" transform-origin="202 88">
+
+          <ellipse cx="202" cy="88" rx="24" ry="29" fill="url(#gR)"/>
+          <ellipse cx="203" cy="87" rx="17" ry="21" fill="#0879B9" opacity="0.38"/>
+          <ellipse cx="203" cy="86" rx="12" ry="15" fill="#1AAEE8" opacity="0.55"/>
+          <circle cx="203" cy="86" r="10" fill="none" stroke="#BAE6FD" stroke-width="1.2" opacity="0.55"/>
+          <circle cx="203" cy="86" r="6"  fill="#55D4F8" opacity="0.5"/>
+          <circle cx="203" cy="86" r="3"  fill="#BAE6FD" opacity="0.85"/>
+          <circle cx="203" cy="86" r="1.2" fill="#F0F9FF"/>
+
+          <!-- NOZZLE pointing RIGHT -->
+          <rect x="220" y="81" width="32" height="13" rx="6.5" fill="#0EA5E9"/>
+          <rect x="220" y="81" width="32" height="5"  rx="3"   fill="#38BDF8" opacity="0.45"/>
+          <!-- tip opening -->
+          <circle cx="249" cy="87.5" r="7"   fill="#06304D" opacity="0.75"/>
+          <circle cx="249" cy="87.5" r="4.5" fill="#0A5F8A"/>
+          <circle cx="249" cy="87.5" r="2"   fill="#1A9CD4" opacity="0.6"/>
+        </g>
+
+        <!-- ═══ PIN Б ═══ -->
+        <g style="opacity:0;animation:pop .35s ease 1.65s forwards" transform-origin="202 28">
+          <path d="M202,30 C198,24 193,21 193,15 A9,9 0 1,1 211,15 C211,21 206,24 202,30Z" fill="#F97316"/>
+          <circle cx="202" cy="15" r="3.5" fill="#F0F9FF"/>
+        </g>
+        <text x="202" y="45" font-size="11" font-weight="700" fill="#0C4A6E" text-anchor="middle"
+              style="opacity:0;animation:fade .3s ease 1.9s forwards">Б</text>
+
+      </svg>
+    </div>
+
+    <div class="name" style="--nd:2.5s">Story<span>Trek</span></div>
+    <div class="tag"  style="--td:2.75s">ГОРОДСКИЕ АУДИОМАРШРУТЫ</div>
+    <div class="dots" style="--dd:2.9s"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<button class="replay" onclick="replay()">↺ Повторить анимацию</button>
+
+<script>
+function replay() {
+  const el = document.getElementById('p1');
+  const c = el.cloneNode(true);
+  el.parentNode.replaceChild(c, el);
+  c.id = 'p1';
+  c.addEventListener('click', replay);
+}
+document.getElementById('p1').addEventListener('click', replay);
+</script>
+</body>
+</html>

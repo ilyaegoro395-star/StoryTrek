@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StoryTrek — Варианты дизайна</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #0D1117;
+  color: #fff;
+  padding: 40px 24px 80px;
+}
+
+h1 {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: #F0F4FF;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.subtitle {
+  text-align: center;
+  color: #5A7090;
+  font-size: 14px;
+  margin-bottom: 48px;
+}
+
+/* ══ LOADER SECTION ══ */
+.loader-section {
+  max-width: 400px;
+  margin: 0 auto 64px;
+  text-align: center;
+}
+.loader-section h2 {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #3A5070;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.loader-phone {
+  width: 320px;
+  height: 580px;
+  background: #F0F8FF;
+  border-radius: 44px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  box-shadow: 0 0 0 8px #1A2535, 0 0 0 10px #0D1825, 0 32px 80px rgba(0,0,0,0.7);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+.loader-phone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(14,165,233,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 80%, rgba(56,189,248,0.08) 0%, transparent 50%);
+}
+.loader-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.logo-svg-wrap {
+  width: 160px;
+  height: 100px;
+  position: relative;
+}
+
+/* Trail + headphone SVG animation */
+.trail-path {
+  stroke-dasharray: 8 12;
+  stroke-dashoffset: 400;
+  animation: drawTrail 1.2s cubic-bezier(0.4,0,0.2,1) 0.2s forwards;
+}
+.headband-path {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: drawSolid 0.6s ease 1.1s forwards;
+}
+.ear-left {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: drawSolid 0.4s ease 1.5s forwards;
+}
+.ear-right {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: drawSolid 0.4s ease 1.7s forwards;
+}
+.earpad-left {
+  opacity: 0;
+  animation: fadeIn 0.3s ease 1.9s forwards;
+}
+.earpad-right {
+  opacity: 0;
+  animation: fadeIn 0.3s ease 2.0s forwards;
+}
+
+@keyframes drawTrail {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes drawSolid {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+.app-name {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0C4A6E;
+  letter-spacing: -0.5px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 2.1s forwards;
+}
+.app-name span {
+  background: linear-gradient(90deg, #0EA5E9, #38BDF8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.tagline {
+  font-size: 12px;
+  color: #5A8AAA;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  animation: fadeIn 0.4s ease 2.4s forwards;
+}
+.loader-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  opacity: 0;
+  animation: fadeIn 0.3s ease 2.5s forwards;
+}
+.loader-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #38BDF8;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.loader-dots span:nth-child(2) { animation-delay: 0.2s; background: #0EA5E9; }
+.loader-dots span:nth-child(3) { animation-delay: 0.4s; background: #0C4A6E; }
+@keyframes pulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.4; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+.replay-hint {
+  font-size: 11px;
+  color: #3A5070;
+  margin-top: 12px;
+}
+
+/* ══ VARIANTS GRID ══ */
+.variants-title {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #3A5070;
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 32px;
+}
+.variants {
+  display: flex;
+  gap: 28px;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.variant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.variant-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.variant-sub {
+  font-size: 11px;
+  color: #3A5070;
+  text-align: center;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* Phone shell */
+.phone {
+  width: 280px;
+  height: 580px;
+  border-radius: 40px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 6px #1A2535, 0 0 0 8px #0D1825, 0 28px 64px rgba(0,0,0,0.65);
+  flex-shrink: 0;
+}
+
+/* ── VARIANT A: Sky Blue Light ── */
+.va .phone { background: #F0F9FF; }
+.va-map {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, #E0F4FF 0%, #CCEEFF 100%);
+}
+.va-map::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14,165,233,0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.va-panel {
+  position: absolute; bottom: 56px; left: 0; right: 0;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(20px);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(14,165,233,0.2);
+  box-shadow: 0 -8px 32px rgba(14,165,233,0.12);
+  padding: 0 16px 16px;
+}
+.va-nav {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 56px;
+  background: rgba(255,255,255,0.98);
+  border-top: 1px solid rgba(14,165,233,0.12);
+  display: flex; backdrop-filter: blur(20px);
+}
+.a-accent { color: #0EA5E9; }
+.a-btn-primary {
+  background: linear-gradient(135deg, #F97316, #EA5A00);
+  color: white; border-radius: 12px; padding: 12px;
+  font-weight: 700; font-size: 13px; text-align: center;
+  box-shadow: 0 4px 16px rgba(249,115,22,0.35);
+}
+.a-input {
+  background: #F0F9FF; border: 1.5px solid #BAE6FD;
+  border-radius: 11px; padding: 10px 12px;
+  color: #0C4A6E; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.a-input.active { border-color: #0EA5E9; background: #E0F4FF; }
+.a-mode {
+  flex: 1; padding: 8px;
+  background: #F0F9FF; border: 1.5px solid #BAE6FD;
+  border-radius: 11px; text-align: center; font-size: 11px;
+  font-weight: 700; color: #7BB8D4;
+}
+.a-mode.active { border-color: #0EA5E9; background: #E0F4FF; color: #0EA5E9; }
+.a-route-line {
+  position: absolute; top: 120px; left: 40px;
+  width: 200px; height: 3px;
+  background: linear-gradient(90deg, #0EA5E9, #38BDF8);
+  border-radius: 2px; box-shadow: 0 0 12px rgba(14,165,233,0.5);
+  transform: rotate(-10deg);
+}
+.a-route-line::before {
+  content: ''; position: absolute;
+  left: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #0EA5E9;
+  box-shadow: 0 0 8px rgba(14,165,233,0.7);
+}
+.a-route-line::after {
+  content: ''; position: absolute;
+  right: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #F97316;
+  box-shadow: 0 0 8px rgba(249,115,22,0.7);
+}
+
+/* ── VARIANT B: Indigo Dusk (мягкий фиолетово-синий) ── */
+.vb .phone { background: #F5F3FF; }
+.vb-map {
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, #EDE9FE 0%, #DDD6FE 60%, #C4B5FD 100%);
+}
+.vb-map::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.vb-panel {
+  position: absolute; bottom: 56px; left: 0; right: 0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(24px);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(99,102,241,0.2);
+  box-shadow: 0 -8px 32px rgba(99,102,241,0.12);
+  padding: 0 16px 16px;
+}
+.vb-nav {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 56px;
+  background: rgba(255,255,255,0.98);
+  border-top: 1px solid rgba(99,102,241,0.12);
+  display: flex; backdrop-filter: blur(20px);
+}
+.b-accent { color: #6366F1; }
+.b-btn-primary {
+  background: linear-gradient(135deg, #6366F1, #818CF8);
+  color: white; border-radius: 12px; padding: 12px;
+  font-weight: 700; font-size: 13px; text-align: center;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+}
+.b-input {
+  background: #F5F3FF; border: 1.5px solid #C4B5FD;
+  border-radius: 11px; padding: 10px 12px;
+  color: #1E1B4B; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.b-input.active { border-color: #6366F1; background: #EDE9FE; }
+.b-mode {
+  flex: 1; padding: 8px;
+  background: #F5F3FF; border: 1.5px solid #C4B5FD;
+  border-radius: 11px; text-align: center; font-size: 11px;
+  font-weight: 700; color: #A5B4FC;
+}
+.b-mode.active { border-color: #6366F1; background: #EDE9FE; color: #6366F1; }
+.b-route-line {
+  position: absolute; top: 120px; left: 40px;
+  width: 200px; height: 3px;
+  background: linear-gradient(90deg, #6366F1, #818CF8);
+  border-radius: 2px; box-shadow: 0 0 12px rgba(99,102,241,0.5);
+  transform: rotate(-10deg);
+}
+.b-route-line::before {
+  content: ''; position: absolute;
+  left: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #6366F1;
+  box-shadow: 0 0 8px rgba(99,102,241,0.7);
+}
+.b-route-line::after {
+  content: ''; position: absolute;
+  right: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #F97316;
+  box-shadow: 0 0 8px rgba(249,115,22,0.7);
+}
+
+/* ── VARIANT C: Warm Sunrise (закат, тёплый) ── */
+.vc .phone { background: #FFFBF0; }
+.vc-map {
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, #FFF7ED 0%, #FEE2C8 60%, #FED7AA 100%);
+}
+.vc-map::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(249,115,22,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249,115,22,0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.vc-panel {
+  position: absolute; bottom: 56px; left: 0; right: 0;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(24px);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(249,115,22,0.2);
+  box-shadow: 0 -8px 32px rgba(249,115,22,0.1);
+  padding: 0 16px 16px;
+}
+.vc-nav {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 56px;
+  background: rgba(255,255,255,0.98);
+  border-top: 1px solid rgba(249,115,22,0.12);
+  display: flex; backdrop-filter: blur(20px);
+}
+.c-accent { color: #F97316; }
+.c-btn-primary {
+  background: linear-gradient(135deg, #0EA5E9, #38BDF8);
+  color: white; border-radius: 12px; padding: 12px;
+  font-weight: 700; font-size: 13px; text-align: center;
+  box-shadow: 0 4px 16px rgba(14,165,233,0.4);
+}
+.c-input {
+  background: #FFF7ED; border: 1.5px solid #FED7AA;
+  border-radius: 11px; padding: 10px 12px;
+  color: #431407; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.c-input.active { border-color: #F97316; background: #FEE2C8; }
+.c-mode {
+  flex: 1; padding: 8px;
+  background: #FFF7ED; border: 1.5px solid #FED7AA;
+  border-radius: 11px; text-align: center; font-size: 11px;
+  font-weight: 700; color: #FDBA74;
+}
+.c-mode.active { border-color: #F97316; background: #FEE2C8; color: #F97316; }
+.c-route-line {
+  position: absolute; top: 120px; left: 40px;
+  width: 200px; height: 3px;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  border-radius: 2px; box-shadow: 0 0 12px rgba(249,115,22,0.5);
+  transform: rotate(-10deg);
+}
+.c-route-line::before {
+  content: ''; position: absolute;
+  left: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #0EA5E9;
+  box-shadow: 0 0 8px rgba(14,165,233,0.7);
+}
+.c-route-line::after {
+  content: ''; position: absolute;
+  right: -4px; top: -4px; width: 10px; height: 10px;
+  border-radius: 50%; background: #F97316;
+  box-shadow: 0 0 8px rgba(249,115,22,0.7);
+}
+
+/* ── Shared phone internals ── */
+.p-handle {
+  height: 28px; display: flex; align-items: center; justify-content: center;
+}
+.p-handle::after {
+  content: ''; width: 40px; height: 4px; border-radius: 100px;
+}
+.va .p-handle::after { background: rgba(14,165,233,0.2); }
+.vb .p-handle::after { background: rgba(99,102,241,0.2); }
+.vc .p-handle::after { background: rgba(249,115,22,0.2); }
+
+.p-logo {
+  padding: 0 16px 8px;
+  font-size: 17px; font-weight: 800; letter-spacing: -0.3px;
+}
+.va .p-logo-main { color: #0C4A6E; }
+.vb .p-logo-main { color: #1E1B4B; }
+.vc .p-logo-main { color: #431407; }
+.va .p-logo-accent { background: linear-gradient(90deg,#0EA5E9,#38BDF8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.vb .p-logo-accent { background: linear-gradient(90deg,#6366F1,#818CF8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.vc .p-logo-accent { background: linear-gradient(90deg,#F97316,#FB923C); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+.p-body { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+.p-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.p-row { display: flex; align-items: center; gap: 8px; }
+.p-modes { display: flex; gap: 6px; }
+
+.p-stats {
+  display: flex; justify-content: space-between; align-items: center;
+  border-radius: 12px; padding: 9px 12px; margin-top: 2px;
+}
+.va .p-stats { background: #EFF9FF; border: 1px solid #BAE6FD; }
+.vb .p-stats { background: #F5F3FF; border: 1px solid #C4B5FD; }
+.vc .p-stats { background: #FFF7ED; border: 1px solid #FED7AA; }
+.p-stat-val { font-size: 14px; font-weight: 700; }
+.p-stat-lbl { font-size: 10px; color: #888; margin-top: 1px; }
+
+.p-nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  font-size: 9px; font-weight: 700;
+}
+.p-nav-item svg { width: 20px; height: 20px; }
+.va .p-nav-inactive { color: #BAE6FD; }
+.vb .p-nav-inactive { color: #C4B5FD; }
+.vc .p-nav-inactive { color: #FED7AA; }
+
+/* FAB */
+.p-fab {
+  position: absolute; right: 14px; bottom: 66px;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.va .p-fab { background: white; border: 1px solid #BAE6FD; color: #0EA5E9; }
+.vb .p-fab { background: white; border: 1px solid #C4B5FD; color: #6366F1; }
+.vc .p-fab { background: white; border: 1px solid #FED7AA; color: #F97316; }
+
+/* ec card */
+.p-ec {
+  border-radius: 12px; overflow: hidden; margin-top: 4px;
+}
+.va .p-ec { border: 1px solid #BAE6FD; }
+.vb .p-ec { border: 1px solid #C4B5FD; }
+.vc .p-ec { border: 1px solid #FED7AA; }
+.p-ec-img {
+  height: 80px; display: flex; align-items: center; justify-content: center;
+  font-size: 32px; position: relative;
+}
+.p-ec-info { padding: 8px 10px; }
+.p-ec-name { font-size: 12px; font-weight: 700; }
+.p-ec-desc { font-size: 10px; color: #888; margin-top: 2px; }
+.va .p-ec-name { color: #0C4A6E; }
+.vb .p-ec-name { color: #1E1B4B; }
+.vc .p-ec-name { color: #431407; }
+
+.chosen-badge {
+  display: inline-block;
+  background: #22C55E;
+  color: white;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 100px;
+  margin-left: 6px; vertical-align: middle;
+}
+
+/* ── replay button ── */
+.replay-btn {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 20px;
+  background: rgba(14,165,233,0.1);
+  border: 1px solid rgba(14,165,233,0.3);
+  color: #38BDF8; font-size: 12px; font-weight: 600;
+  border-radius: 100px; cursor: pointer;
+  transition: background .15s;
+  font-family: 'Inter', sans-serif;
+}
+.replay-btn:hover { background: rgba(14,165,233,0.18); }
+</style>
+</head>
+<body>
+
+<h1>StoryTrek — Варианты дизайна</h1>
+<p class="subtitle">Нажми на лоадер для повтора анимации · Выбери вариант палитры</p>
+
+<!-- ══ LOADER ══ -->
+<div class="loader-section">
+  <h2>Лоадер / Сплэш-экран</h2>
+  <div class="loader-phone" id="loaderPhone">
+    <div class="loader-inner">
+      <!-- Trail + Headphones SVG -->
+      <div class="logo-svg-wrap">
+        <svg viewBox="0 0 200 110" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:200px;height:110px;overflow:visible">
+          <!-- Trail coming in from bottom-left -->
+          <path id="trail"
+            d="M 5,105 C 15,88 22,75 30,65 C 38,55 44,50 50,46"
+            stroke="#38BDF8" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"
+            class="trail-path"/>
+
+          <!-- Headband arc -->
+          <path id="headband"
+            d="M 50,46 A 50,52 0 0,1 150,46"
+            stroke="#0EA5E9" stroke-width="3"
+            stroke-linecap="round" fill="none"
+            class="headband-path"/>
+
+          <!-- Trail out from right -->
+          <path id="trail2"
+            d="M 150,46 C 156,50 162,55 170,65 C 178,75 185,88 195,105"
+            stroke="#38BDF8" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"
+            style="stroke-dasharray:8 12; stroke-dashoffset:200; animation: drawTrail 0.8s cubic-bezier(0.4,0,0.2,1) 1.35s forwards;"/>
+
+          <!-- Left ear cup (U shape) -->
+          <path id="earL"
+            d="M 50,46 L 50,75 A 22,22 0 0,0 26,75 L 26,46"
+            stroke="#0EA5E9" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"
+            class="ear-left"/>
+
+          <!-- Right ear cup (U shape) -->
+          <path id="earR"
+            d="M 150,46 L 150,75 A 22,22 0 0,1 174,75 L 174,46"
+            stroke="#0EA5E9" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"
+            class="ear-right"/>
+
+          <!-- Left ear pad fill -->
+          <ellipse cx="38" cy="66" rx="12" ry="16"
+            fill="rgba(14,165,233,0.15)" stroke="#38BDF8" stroke-width="1.5"
+            class="earpad-left"/>
+
+          <!-- Right ear pad fill -->
+          <ellipse cx="162" cy="66" rx="12" ry="16"
+            fill="rgba(14,165,233,0.15)" stroke="#38BDF8" stroke-width="1.5"
+            class="earpad-right"/>
+
+          <!-- Center dot on headband -->
+          <circle cx="100" cy="24" r="4"
+            fill="#0EA5E9"
+            style="opacity:0; animation: fadeIn 0.3s ease 1.85s forwards;"/>
+        </svg>
+      </div>
+
+      <div class="app-name">Story<span>Trek</span></div>
+      <div class="tagline">ГОРОДСКИЕ АУДИОМАРШРУТЫ</div>
+      <div class="loader-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+  <button class="replay-btn" onclick="replayLoader()">↺ Повторить анимацию</button>
+  <p class="replay-hint" style="margin-top:8px">Нажми на экран тоже</p>
+</div>
+
+<!-- ══ VARIANTS ══ -->
+<p class="variants-title">Три варианта палитры — выбери</p>
+<div class="variants">
+
+  <!-- VARIANT A: Sky Blue -->
+  <div class="variant va">
+    <span class="variant-label" style="color:#0EA5E9">А — Sky Blue <span class="chosen-badge">✓ рекомендован</span></span>
+    <div class="phone">
+      <div class="va-map"></div>
+      <div class="a-route-line"></div>
+      <div class="va-panel">
+        <div class="p-handle"></div>
+        <div class="p-logo"><span class="p-logo-main">Story</span><span class="p-logo-accent">Trek</span></div>
+        <div class="p-body">
+          <div class="p-row">
+            <div class="p-dot" style="background:#0EA5E9"></div>
+            <div class="a-input active" style="flex:1;font-size:12px">Металлургов, 12</div>
+          </div>
+          <div class="p-row">
+            <div class="p-dot" style="background:#F97316"></div>
+            <div class="a-input" style="flex:1;font-size:12px">Соборная горка</div>
+          </div>
+          <div class="p-modes">
+            <div class="a-mode active">🚶 Пешком</div>
+            <div class="a-mode">🚲 Велосипед</div>
+          </div>
+          <div class="p-stats">
+            <div><div class="p-stat-val a-accent">3.5 км</div><div class="p-stat-lbl">расстояние</div></div>
+            <div><div class="p-stat-val a-accent">52 мин</div><div class="p-stat-lbl">пешком</div></div>
+          </div>
+          <div class="a-btn-primary">Построить маршрут →</div>
+          <div class="p-ec">
+            <div class="p-ec-img" style="background:linear-gradient(135deg,#1e3a5f,#2a6496)">⛪</div>
+            <div class="p-ec-info">
+              <div class="p-ec-name">Историческое сердце</div>
+              <div class="p-ec-desc">Соборная горка · Музей Верещагина</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-fab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        </svg>
+      </div>
+      <div class="va-nav">
+        <div class="p-nav-item a-accent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+            <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+          </svg>Маршрут
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>Готовые
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>Сохранённые
+        </div>
+      </div>
+    </div>
+    <p class="variant-sub">Небесно-голубой фон + белая панель + оранжевая CTA. Лёгкий, приятный, ассоциируется с небом и дорогой.</p>
+  </div>
+
+  <!-- VARIANT B: Indigo -->
+  <div class="variant vb">
+    <span class="variant-label" style="color:#818CF8">Б — Indigo Dream</span>
+    <div class="phone">
+      <div class="vb-map"></div>
+      <div class="b-route-line"></div>
+      <div class="vb-panel">
+        <div class="p-handle"></div>
+        <div class="p-logo"><span class="p-logo-main">Story</span><span class="p-logo-accent">Trek</span></div>
+        <div class="p-body">
+          <div class="p-row">
+            <div class="p-dot" style="background:#6366F1"></div>
+            <div class="b-input active" style="flex:1;font-size:12px">Металлургов, 12</div>
+          </div>
+          <div class="p-row">
+            <div class="p-dot" style="background:#F97316"></div>
+            <div class="b-input" style="flex:1;font-size:12px">Соборная горка</div>
+          </div>
+          <div class="p-modes">
+            <div class="b-mode active">🚶 Пешком</div>
+            <div class="b-mode">🚲 Велосипед</div>
+          </div>
+          <div class="p-stats">
+            <div><div class="p-stat-val b-accent">3.5 км</div><div class="p-stat-lbl">расстояние</div></div>
+            <div><div class="p-stat-val b-accent">52 мин</div><div class="p-stat-lbl">пешком</div></div>
+          </div>
+          <div class="b-btn-primary">Построить маршрут →</div>
+          <div class="p-ec">
+            <div class="p-ec-img" style="background:linear-gradient(135deg,#1e3a5f,#2a6496)">⛪</div>
+            <div class="p-ec-info">
+              <div class="p-ec-name">Историческое сердце</div>
+              <div class="p-ec-desc">Соборная горка · Музей Верещагина</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-fab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        </svg>
+      </div>
+      <div class="vb-nav">
+        <div class="p-nav-item b-accent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+            <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+          </svg>Маршрут
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>Готовые
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>Сохранённые
+        </div>
+      </div>
+    </div>
+    <p class="variant-sub">Мягкий индиго-лавандовый фон — загадочно, артистично, вдохновляет на приключение. CTA фиолетовый.</p>
+  </div>
+
+  <!-- VARIANT C: Warm Sunrise -->
+  <div class="variant vc">
+    <span class="variant-label" style="color:#F97316">В — Warm Sunrise</span>
+    <div class="phone">
+      <div class="vc-map"></div>
+      <div class="c-route-line"></div>
+      <div class="vc-panel">
+        <div class="p-handle"></div>
+        <div class="p-logo"><span class="p-logo-main">Story</span><span class="p-logo-accent">Trek</span></div>
+        <div class="p-body">
+          <div class="p-row">
+            <div class="p-dot" style="background:#0EA5E9"></div>
+            <div class="c-input active" style="flex:1;font-size:12px">Металлургов, 12</div>
+          </div>
+          <div class="p-row">
+            <div class="p-dot" style="background:#F97316"></div>
+            <div class="c-input" style="flex:1;font-size:12px">Соборная горка</div>
+          </div>
+          <div class="p-modes">
+            <div class="c-mode active">🚶 Пешком</div>
+            <div class="c-mode">🚲 Велосипед</div>
+          </div>
+          <div class="p-stats">
+            <div><div class="p-stat-val c-accent">3.5 км</div><div class="p-stat-lbl">расстояние</div></div>
+            <div><div class="p-stat-val c-accent">52 мин</div><div class="p-stat-lbl">пешком</div></div>
+          </div>
+          <div class="c-btn-primary">Построить маршрут →</div>
+          <div class="p-ec">
+            <div class="p-ec-img" style="background:linear-gradient(135deg,#1e3a5f,#2a6496)">⛪</div>
+            <div class="p-ec-info">
+              <div class="p-ec-name">Историческое сердце</div>
+              <div class="p-ec-desc">Соборная горка · Музей Верещагина</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-fab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        </svg>
+      </div>
+      <div class="vc-nav">
+        <div class="p-nav-item c-accent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+            <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+          </svg>Маршрут
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>Готовые
+        </div>
+        <div class="p-nav-item p-nav-inactive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>Сохранённые
+        </div>
+      </div>
+    </div>
+    <p class="variant-sub">Тёплый рассвет — персиково-оранжевый + голубой акцент. Энергичный, радостный, мотивирует выйти на прогулку.</p>
+  </div>
+
+</div>
+
+<script>
+function replayLoader() {
+  const phone = document.getElementById('loaderPhone');
+  phone.innerHTML = phone.innerHTML;
+  // Force reflow
+  void phone.offsetWidth;
+}
+document.getElementById('loaderPhone').addEventListener('click', replayLoader);
+</script>
+</body>
+</html>
