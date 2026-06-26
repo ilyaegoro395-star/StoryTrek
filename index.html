@@ -1137,9 +1137,10 @@ async function buildRoute() {
         return { coords, dist, dur };
       })(),
       (async () => {
+        /* OSRM foot — includes footways, paths, pedestrian bridges */
         const cs = pts.map(w => `${w.lng},${w.lat}`).join(';');
         const r = await fetch(
-          `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson`,
+          `https://router.project-osrm.org/route/v1/foot/${cs}?overview=full&geometries=geojson&steps=false`,
           { signal: AbortSignal.timeout(12000) });
         const d = await r.json();
         if (d.code !== 'Ok') throw new Error(d.message || 'OSRM error');
@@ -1210,9 +1211,16 @@ async function buildRoute() {
 
 function drawRoute(coords, pts) {
   clearRoute();
+  const isBike = transportMode === 'bike';
   routeLine = new ymaps.GeoObject(
     { geometry: { type: 'LineString', coordinates: coords } },
-    { geodesic: false, strokeWidth: 5, strokeColor: '#0EA5E9', strokeOpacity: 0.92 }
+    {
+      geodesic:      false,
+      strokeWidth:   isBike ? 5 : 4,
+      strokeColor:   isBike ? '#22C55E' : '#6366F1',
+      strokeOpacity: 0.95,
+      strokeStyle:   isBike ? 'solid' : 'dash',
+    }
   );
   ymap.geoObjects.add(routeLine);
   pts.forEach((p, i) => {
