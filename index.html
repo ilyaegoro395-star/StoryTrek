@@ -372,6 +372,17 @@ html, body {
 /* ── explore panel — extra styles ── */
 .explore-filters { display: flex; flex-direction: column; gap: 9px; margin-bottom: 4px; }
 .explore-city-wrap { position: relative; }
+#city-sug {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 99;
+  background: var(--panel); border: 1px solid var(--border-hi);
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+#city-sug div {
+  padding: 11px 14px; font-size: 14px; color: var(--text-1); cursor: pointer;
+  transition: background .15s;
+}
+#city-sug div:hover { background: var(--accent-dim); }
 #dist-filter { display: flex; gap: 6px; flex-wrap: wrap; }
 .dist-btn {
   padding: 5px 13px;
@@ -396,7 +407,7 @@ html, body {
   transform: translateY(-1px);
 }
 .ec-img {
-  width: 100%; height: 136px;
+  width: 100%; aspect-ratio: 16/9;
   display: flex; align-items: center; justify-content: center;
   font-size: 52px; position: relative; overflow: hidden;
 }
@@ -535,6 +546,7 @@ html, body {
     <div class="explore-filters">
       <div class="explore-city-wrap">
         <input id="explore-city" class="addr-input" type="text" placeholder="Город" autocomplete="off">
+        <div id="city-sug" style="display:none"></div>
       </div>
       <div id="dist-filter">
         <button class="dist-btn active" data-km="0">Любое</button>
@@ -1319,17 +1331,25 @@ async function wikiGeoSearch(lat, lng, radius, limit) {
   } catch { return []; }
 }
 
-/* article summary: photo + extract + Wikidata description */
+/* article summary: high-res photo (800px via pageimages API) + extract + description */
 async function wikiSummary(title) {
   try {
-    const r = await fetch(
-      `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
-    if (!r.ok) return null;
-    const d = await r.json();
+    const enc = encodeURIComponent(title);
+    const [sumR, imgR] = await Promise.all([
+      fetch(`https://ru.wikipedia.org/api/rest_v1/page/summary/${enc}`),
+      fetch(`https://ru.wikipedia.org/w/api.php?action=query&prop=pageimages` +
+            `&pithumbsize=800&titles=${enc}&format=json&origin=*`)
+    ]);
+    if (!sumR.ok) return null;
+    const sum = await sumR.json();
+    const imgD = imgR.ok ? await imgR.json() : {};
+    const page = Object.values(imgD.query?.pages || {})[0];
+    const photoUrl = page?.thumbnail?.source    // high-res from pageimages API
+                  || (sum.thumbnail?.source);   // fallback: REST summary thumbnail
     return {
-      photoUrl:    d.thumbnail ? d.thumbnail.source : null,
-      extract:     d.extract     || '',
-      description: d.description || ''   // Wikidata short desc, e.g. "православный храм в Москве"
+      photoUrl:    photoUrl || null,
+      extract:     sum.extract     || '',
+      description: sum.description || ''
     };
   } catch { return null; }
 }
@@ -1936,8 +1956,38 @@ function loadCatalogRoute(id) {
   buildRoute();
 }
 
-document.getElementById('explore-city').addEventListener('input', e => {
+/* ─── city autocomplete ─── */
+const CATALOG_CITIES = [...new Set(CATALOG.map(r => r.city))].sort();
+
+const exploreCityInput = document.getElementById('explore-city');
+const citySugEl        = document.getElementById('city-sug');
+
+function showCitySug(val) {
+  const q = val.trim().toLowerCase();
+  const matches = q.length === 0
+    ? CATALOG_CITIES                                          // empty → show all
+    : CATALOG_CITIES.filter(c => c.toLowerCase().includes(q));
+  if (!matches.length) { citySugEl.style.display = 'none'; return; }
+  citySugEl.innerHTML = matches
+    .map(c => `<div data-city="${c}">${c}</div>`).join('');
+  citySugEl.style.display = 'block';
+}
+
+exploreCityInput.addEventListener('focus', e => showCitySug(e.target.value));
+exploreCityInput.addEventListener('input', e => {
   exploreCity = e.target.value;
+  showCitySug(e.target.value);
+  renderCatalog();
+});
+exploreCityInput.addEventListener('blur', () => {
+  setTimeout(() => { citySugEl.style.display = 'none'; }, 150);
+});
+citySugEl.addEventListener('mousedown', e => {
+  const city = e.target.dataset.city;
+  if (!city) return;
+  exploreCityInput.value = city;
+  exploreCity = city;
+  citySugEl.style.display = 'none';
   renderCatalog();
 });
 
