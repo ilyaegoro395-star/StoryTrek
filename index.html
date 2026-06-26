@@ -1299,7 +1299,7 @@ async function wikiGeoSearch(lat, lng, radius, limit) {
   } catch { return []; }
 }
 
-/* article summary: photo + short extract */
+/* article summary: photo + extract + Wikidata description */
 async function wikiSummary(title) {
   try {
     const r = await fetch(
@@ -1307,10 +1307,107 @@ async function wikiSummary(title) {
     if (!r.ok) return null;
     const d = await r.json();
     return {
-      photoUrl: d.thumbnail ? d.thumbnail.source.replace(/\/\d+px-/, '/440px-') : null,
-      extract:  d.extract || ''
+      photoUrl:    d.thumbnail ? d.thumbnail.source.replace(/\/\d+px-/, '/440px-') : null,
+      extract:     d.extract     || '',
+      description: d.description || ''   // Wikidata short desc, e.g. "православный храм в Москве"
     };
   } catch { return null; }
+}
+
+/* average monthly Wikipedia pageviews (last 3 months) */
+async function fetchPageviews(title) {
+  try {
+    const now = new Date();
+    const months = [0, 1, 2].map(i => {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}01`;
+    });
+    const [m1, m2, m3] = months;
+    const u = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/` +
+      `ru.wikipedia.org/all-access/all-agents/${encodeURIComponent(title)}/monthly/${m3}/${m1}`;
+    const r = await fetch(u);
+    if (!r.ok) return 0;
+    const d = await r.json();
+    const items = d.items || [];
+    if (!items.length) return 0;
+    return Math.round(items.reduce((s, x) => s + x.views, 0) / items.length);
+  } catch { return 0; }
+}
+
+/* ── scoring ──────────────────────────────────────────────────────────────────
+   Returns a score 0–100 (higher = more interesting historically).
+   Negative score = blacklisted, never show.                                  */
+function scorePoint(sum) {
+  const text = ((sum.description || '') + ' ' + (sum.extract || '').slice(0, 300)).toLowerCase();
+
+  // ── blacklist: roads, districts, modern commercial/residential ──
+  if (/^(улица|проспект|шоссе|переулок|тупик|набережная|бульвар|аллея)\b/.test(sum.description.toLowerCase()))
+    return -1000;
+  if (/\b(жилой дом|жилой квартал|микрорайон|торговый центр|гипермаркет|бизнес-центр|офисный|спортивный комплекс|стадион)\b/.test(text))
+    return -500;
+  if (/\b(муниципальн|административн)\b.{0,30}\b(округ|район|образование)\b/.test(text))
+    return -500;
+
+  let score = 0;
+
+  // ── type bonus (0–30) ──
+  if      (/\b(храм|церковь|церкви|собор|монастырь|часовня|скит)\b/.test(text))          score += 30;
+  else if (/\b(усадьба|особняк|дворец|поместье|имение)\b/.test(text))                    score += 28;
+  else if (/\b(памятник|монумент|обелиск|мемориал|мемориальн)\b/.test(text))             score += 25;
+  else if (/\b(музей|галерея)\b/.test(text))                                             score += 22;
+  else if (/\b(башня|крепость|кремль|острог|форт|цитадель)\b/.test(text))               score += 28;
+  else if (/\b(парк|сад|усадебн)\b/.test(text))                                         score += 15;
+  else if (/\b(объект культурного наследия|архитектурный памятник|историческ)\b/.test(text)) score += 15;
+  else if (/\b(площадь|рынок)\b/.test(text))                                            score += 8;
+  // mild penalty for generic institutions (may still be historical)
+  else if (/\b(завод|фабрика|предприятие|организация|учреждение)\b/.test(text))          score -= 5;
+
+  // ── age bonus (0–25): extract earliest credible year from article ──
+  const years = (sum.extract || '').match(/\b(1[0-9]{3})\b/g);
+  if (years) {
+    const earliest = Math.min(...years.map(Number).filter(y => y >= 1100 && y <= 1991));
+    if      (earliest < 1600) score += 25;
+    else if (earliest < 1700) score += 22;
+    else if (earliest < 1800) score += 18;
+    else if (earliest < 1860) score += 14;
+    else if (earliest < 1900) score += 10;
+    else if (earliest < 1940) score +=  6;
+    else if (earliest < 1991) score +=  3;
+  }
+
+  // ── content richness (0–15) ──
+  const len = (sum.extract || '').length;
+  if      (len > 800) score += 15;
+  else if (len > 400) score += 10;
+  else if (len > 150) score +=  5;
+  else if (len > 30)  score +=  2;
+  else return -1;    // basically empty — skip
+
+  // ── photo bonus (0–10) ──
+  if (sum.photoUrl) score += 10;
+
+  // ── pageviews bonus (0–20) ──
+  const pv = sum.pageviews || 0;
+  if      (pv > 50000) score += 20;
+  else if (pv > 10000) score += 16;
+  else if (pv >  5000) score += 12;
+  else if (pv >  1000) score +=  8;
+  else if (pv >   200) score +=  4;
+
+  return score;
+}
+
+/* greedy spacing selection: pick highest-scored points ensuring MIN_GAP metres
+   between any two selected, then re-sort by route order for display */
+function selectByScoreWithSpacing(scoredPoints, minGap, maxCount) {
+  const sorted = [...scoredPoints].sort((a, b) => b.score - a.score);
+  const selected = [];
+  for (const p of sorted) {
+    if (selected.length >= maxCount) break;
+    const tooClose = selected.some(s => haversine([s.lat, s.lng], [p.lat, p.lng]) < minGap);
+    if (!tooClose) selected.push(p);
+  }
+  return selected.sort((a, b) => a.order - b.order);
 }
 
 /* index of the route vertex nearest to a coordinate — used to order points along the path */
@@ -1367,25 +1464,27 @@ function drawStoryMarkers(points) {
   });
 }
 
-/* Build story points FROM the actual route: walk the polyline, find real
-   Wikipedia objects along it, snap them onto the line, preload their photos.
-   Guarantees: points sit on the route, every shown point has a photo. */
+/* Build story points FROM the actual route using a scored ranking:
+   churches, mansions, monuments score high; roads and modern buildings
+   score negative and are filtered out. Within candidates, highest-scored
+   points win — not just the first N in spatial order.                      */
 async function buildStoryPoints() {
   if (routeCoords.length < 2) return;
-  const token = ++storyBuildToken;     // invalidate any earlier in-flight build
+  const token = ++storyBuildToken;
   currentStoryPoints = [];
 
-  const SEARCH_RADIUS = 350;   // m around each probe to look for articles
-  const SNAP_MAX      = 300;   // m — discard articles farther than this from the route
-  const MIN_GAP       = 250;   // m along route between consecutive points
+  const SEARCH_RADIUS = 500;   // m — wide net to find more candidates
+  const SNAP_MAX      = 350;   // m — max distance from route to be included
+  const MIN_GAP       = 200;   // m — minimum spacing between selected points
   const MAX_POINTS    = 12;
+  const PROBES        = 24;    // sample points along the route
 
-  // 1. probe Wikipedia along the route
-  const probes = sampleAlongRoute(16);
+  // ── 1. collect all Wikipedia articles near the route ──────────────────────
+  const probes = sampleAlongRoute(PROBES);
   const seen = new Set();
   const candidates = [];
   const batches = await Promise.all(
-    probes.map(([lat, lng]) => wikiGeoSearch(lat, lng, SEARCH_RADIUS, 4))
+    probes.map(([lat, lng]) => wikiGeoSearch(lat, lng, SEARCH_RADIUS, 6))
   );
   if (token !== storyBuildToken) return;
   batches.flat().forEach(a => {
@@ -1394,36 +1493,55 @@ async function buildStoryPoints() {
     candidates.push(a);
   });
 
-  // 2. snap to route, keep those close enough, order along the path
-  const onRoute = [];
-  candidates.forEach(a => {
-    const s = snapToRoute(a.lat, a.lng, SNAP_MAX);
-    if (s) onRoute.push({ title: a.title, lat: s.lat, lng: s.lng,
-                          order: routeOrderIndex(a.lat, a.lng) });
-  });
-  onRoute.sort((x, y) => x.order - y.order);
+  // ── 2. snap to route ───────────────────────────────────────────────────────
+  const onRoute = candidates
+    .map(a => {
+      const s = snapToRoute(a.lat, a.lng, SNAP_MAX);
+      if (!s) return null;
+      return { title: a.title, lat: s.lat, lng: s.lng, order: routeOrderIndex(a.lat, a.lng) };
+    })
+    .filter(Boolean);
+  console.log(`story points: ${candidates.length} found, ${onRoute.length} on route`);
 
-  // 3. thin out points that are too close together
-  const spaced = [];
-  onRoute.forEach(p => {
-    const last = spaced[spaced.length - 1];
-    if (!last || haversine([last.lat, last.lng], [p.lat, p.lng]) >= MIN_GAP)
-      spaced.push(p);
-  });
-  const picked = spaced.slice(0, MAX_POINTS);
+  // ── 3. fetch summaries for all candidates in parallel ─────────────────────
+  const withSummary = (await Promise.all(
+    onRoute.map(async p => {
+      const sum = await wikiSummary(p.title);
+      if (!sum) return null;
+      const preliminary = scorePoint(sum);
+      if (preliminary < 0) return null;          // blacklisted type — drop immediately
+      return { ...p, sum, score: preliminary };
+    })
+  )).filter(Boolean);
 
-  // 4. fetch summaries; keep any point with a meaningful story (photo optional —
-  //    historical/lost places often have an article but no photo). Preload photos that exist.
-  const detailed = (await Promise.all(picked.map(async p => {
-    const sum = await wikiSummary(p.title);
-    if (!sum || (!sum.photoUrl && (sum.extract || '').length < 30)) return null; // need some content
-    if (sum.photoUrl) { const img = new Image(); img.referrerPolicy = 'no-referrer'; img.crossOrigin = 'anonymous'; img.src = sum.photoUrl; } // preload → instant on tap
+  if (token !== storyBuildToken) return;
+
+  // ── 4. fetch pageviews only for top-30 by preliminary score ───────────────
+  const top30 = [...withSummary].sort((a, b) => b.score - a.score).slice(0, 30);
+  await Promise.all(top30.map(async p => {
+    p.sum.pageviews = await fetchPageviews(p.title);
+    p.score = scorePoint(p.sum);   // re-score with pageviews
+  }));
+
+  if (token !== storyBuildToken) return;
+
+  // ── 5. select best points with spacing constraint ─────────────────────────
+  const finalScored = withSummary.filter(p => p.score >= 0);
+  const picked = selectByScoreWithSpacing(finalScored, MIN_GAP, MAX_POINTS);
+  console.log(`story points: ${finalScored.length} scored → ${picked.length} selected`);
+
+  // ── 6. build display objects, preload photos ───────────────────────────────
+  const detailed = picked.map(p => {
+    if (p.sum.photoUrl) {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.crossOrigin = 'anonymous';
+      img.src = p.sum.photoUrl;
+    }
     return { name: p.title, lat: p.lat, lng: p.lng,
-             story: sum.extract, photoUrl: sum.photoUrl || null };
-  }))).filter(Boolean);
+             story: p.sum.extract, photoUrl: p.sum.photoUrl || null, score: p.score };
+  });
 
-  if (token !== storyBuildToken) return;         // a newer route superseded us
-  console.log(`story points: ${candidates.length} candidates → ${detailed.length} on route with photos`);
   currentStoryPoints = detailed;
   drawStoryMarkers(detailed);
 }
