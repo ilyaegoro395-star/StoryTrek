@@ -400,6 +400,12 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   font-size: 52px; position: relative; overflow: hidden;
 }
+.ec-img img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  transition: opacity .35s ease;
+}
+.ec-img img ~ .ec-emoji { display: none; }
 .ec-img::after {
   content: '';
   position: absolute; inset: 0;
@@ -528,7 +534,7 @@ html, body {
   <div class="card-body">
     <div class="explore-filters">
       <div class="explore-city-wrap">
-        <input id="explore-city" class="addr-input" type="text" placeholder="Город" value="Череповец" autocomplete="off">
+        <input id="explore-city" class="addr-input" type="text" placeholder="Город" autocomplete="off">
       </div>
       <div id="dist-filter">
         <button class="dist-btn active" data-km="0">Любое</button>
@@ -774,7 +780,13 @@ function openPanel(which) {
   other.classList.remove('open', 'peek');
   document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.add('active');
   document.getElementById(which === 'route' ? 'nav-explore' : 'nav-route').classList.remove('active');
-  if (which === 'explore') renderCatalog();
+  if (which === 'explore') {
+    if (myCity && !exploreCity) {
+      exploreCity = myCity;
+      document.getElementById('explore-city').value = myCity;
+    }
+    renderCatalog();
+  }
   updateFab();
 }
 
@@ -1827,8 +1839,9 @@ const CATALOG = [
     ]},
 ];
 
-let exploreCity  = 'Череповец';
+let exploreCity  = '';
 let exploreMaxKm = 0;
+const catalogPhotoCache = {};   // routeId → photoUrl | null
 
 function renderCatalog() {
   const cardsEl = document.getElementById('explore-cards');
@@ -1848,9 +1861,13 @@ function renderCatalog() {
       ? `${Math.floor(r.durationMin/60)} ч ${r.durationMin % 60 ? r.durationMin%60+' мин' : ''}`
       : `${r.durationMin} мин`;
     const mode = r.type === 'foot' ? '🚶 Пешком' : '🚲 Велосипед';
+    const cachedPhoto = catalogPhotoCache[r.id];
+    const photoHtml = cachedPhoto
+      ? `<img src="${cachedPhoto}" referrerpolicy="no-referrer" loading="eager">`
+      : '';
     return `<div class="ec-card" onclick="loadCatalogRoute('${r.id}')">
-      <div class="ec-img" style="background:${r.color}">
-        <span>${r.emoji}</span>
+      <div class="ec-img" id="ec-img-${r.id}" style="background:${r.color}">
+        ${photoHtml}<span class="ec-emoji">${r.emoji}</span>
         <div class="ec-badge">${dist} · ${dur}</div>
       </div>
       <div class="ec-info">
@@ -1863,6 +1880,47 @@ function renderCatalog() {
       </div>
     </div>`;
   }).join('');
+
+  // async: load photos for cards that don't have one yet
+  filtered.forEach(r => {
+    if (catalogPhotoCache[r.id] !== undefined) return;
+    catalogPhotoCache[r.id] = null;  // mark as loading
+    fetchCatalogPhoto(r);
+  });
+}
+
+/* find the most significant Wikipedia photo near the route's first waypoint */
+async function fetchCatalogPhoto(route) {
+  try {
+    const pt = route.points[0];
+    const articles = await wikiGeoSearch(pt.lat, pt.lng, 600, 8);
+    if (!articles.length) return;
+
+    // score and pick best article that has a photo
+    const summaries = await Promise.all(articles.map(async a => {
+      const s = await wikiSummary(a.title);
+      return s ? { ...s, title: a.title } : null;
+    }));
+    const scored = summaries
+      .filter(s => s && s.photoUrl)
+      .map(s => ({ ...s, score: scorePoint(s) }))
+      .filter(s => s.score >= 0)
+      .sort((a, b) => b.score - a.score);
+
+    if (!scored.length) return;
+    const best = scored[0];
+    catalogPhotoCache[route.id] = best.photoUrl;
+
+    // inject photo into the already-rendered card (if still visible)
+    const imgWrap = document.getElementById(`ec-img-${route.id}`);
+    if (!imgWrap) return;
+    const img = document.createElement('img');
+    img.src = best.photoUrl;
+    img.referrerPolicy = 'no-referrer';
+    img.style.opacity = '0';
+    img.onload = () => { img.style.opacity = '1'; };
+    imgWrap.insertBefore(img, imgWrap.firstChild);
+  } catch {}
 }
 
 function loadCatalogRoute(id) {
