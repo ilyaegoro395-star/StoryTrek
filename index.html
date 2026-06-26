@@ -547,6 +547,12 @@ html, body {
   border-color: var(--accent);
   color: var(--accent);
 }
+.pf-msg {
+  text-align: center; font-size: 13px; font-weight: 600;
+  padding: 12px 0 0; color: #16A34A;
+}
+.pf-msg.error { color: var(--red); }
+#pf-save:disabled { opacity: .45; cursor: default; }
 .pf-signout-btn {
   width: 100%; margin-top: 12px; padding: 12px;
   background: none; border: 1.5px solid rgba(239,68,68,.3);
@@ -863,7 +869,8 @@ html, body {
         <button class="lang-btn" data-lang="fr">🇫🇷 Français</button>
       </div>
 
-      <button id="pf-save" class="auth-btn" style="margin-top:20px">Сохранить</button>
+      <button id="pf-save" class="auth-btn" style="margin-top:20px" disabled>Сохранить</button>
+      <div id="pf-msg" class="pf-msg" style="display:none"></div>
       <button id="pf-signout" class="pf-signout-btn">Выйти из аккаунта</button>
     </div>
 
@@ -1978,12 +1985,22 @@ function renderGuide() {
 }
 
 /* ─── TTS ─── */
-async function synthesizeSeg(idx) {
+// Yandex SpeechKit covers ru/en well; zh/de/fr fall back to the browser's voices.
+const TTS_CONFIG = {
+  ru: { server: true,  lang: 'ru-RU', voice: 'ermil', speed: '0.88', bcp: 'ru-RU' },
+  en: { server: true,  lang: 'en-US', voice: 'john',  speed: '0.95', bcp: 'en-US' },
+  de: { server: false, bcp: 'de-DE' },
+  fr: { server: false, bcp: 'fr-FR' },
+  zh: { server: false, bcp: 'zh-CN' },
+};
+function ttsCfg() { return TTS_CONFIG[guideLanguage] || TTS_CONFIG.ru; }
+
+async function synthesizeSeg(idx, cfg) {
   try {
     const r = await fetch('/api/synthesize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanText(segments[idx]), voice: 'ermil', speed: '0.88' }),
+      body: JSON.stringify({ text: cleanText(segments[idx]), voice: cfg.voice, speed: cfg.speed, lang: cfg.lang }),
       signal: AbortSignal.timeout(30000)
     });
     if (!r.ok) {
@@ -1998,6 +2015,10 @@ async function synthesizeSeg(idx) {
   }
 }
 
+function advanceAfterSegment() {
+  if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
+}
+
 async function playSegment(idx) {
   const gen = ++playGen;
   if (audio) { audio.pause(); audio = null; }
@@ -2005,25 +2026,39 @@ async function playSegment(idx) {
   if (idx < 0 || idx >= segments.length) return;
   document.querySelectorAll('.seg').forEach((el, i) => el.classList.toggle('active', i === idx));
   currentSeg = idx;
+  const cfg = ttsCfg();
+
+  // languages Yandex doesn't cover → browser speech synthesis directly
+  if (!cfg.server) {
+    setStatus('Озвучиваем…', 'info');
+    browserTTS(segments[idx], cfg.bcp, () => { if (gen === playGen) { setStatus(''); advanceAfterSegment(); } });
+    return;
+  }
+
   setStatus('Загружаем аудио…', 'info');
-  const blob = await synthesizeSeg(idx);
+  const blob = await synthesizeSeg(idx, cfg);
   if (gen !== playGen) return;
-  if (!blob) { browserTTS(segments[idx]); return; }
+  if (!blob) { browserTTS(segments[idx], cfg.bcp, () => { if (gen === playGen) advanceAfterSegment(); }); return; }
   const url = URL.createObjectURL(blob);
   audio = new Audio(url);
   audio.onended = () => {
     URL.revokeObjectURL(url);
     setStatus('');
-    if (navActive && !navPaused && currentSeg + 1 < segments.length) playSegment(currentSeg + 1);
+    advanceAfterSegment();
   };
-  audio.play().catch(e => { console.error('play error:', e); browserTTS(segments[idx]); });
+  audio.play().catch(e => { console.error('play error:', e); browserTTS(segments[idx], cfg.bcp, advanceAfterSegment); });
   setStatus('');
 }
 
-function browserTTS(text) {
-  if (!window.speechSynthesis) return;
+function browserTTS(text, lang = 'ru-RU', onend) {
+  if (!window.speechSynthesis) { if (onend) onend(); return; }
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'ru-RU';
+  u.lang = lang;
+  const voices = speechSynthesis.getVoices();
+  const base   = lang.split('-')[0];
+  const v = voices.find(x => x.lang === lang) || voices.find(x => x.lang && x.lang.startsWith(base));
+  if (v) u.voice = v;
+  if (onend) u.onend = onend;
   speechSynthesis.speak(u);
 }
 
@@ -2680,7 +2715,9 @@ function openProfilePanel() {
   document.getElementById('nav-explore').classList.remove('active');
   profilePanel.classList.add('open');
   document.getElementById('nav-profile').classList.add('active');
+  hideProfileMsg();
   renderProfilePanel();
+  if (sbUser) loadUserProfile();   // refresh fields from DB / metadata each open
   updateFab();
 }
 
@@ -2819,26 +2856,65 @@ function updateLangButtons() {
     btn.classList.toggle('active', btn.dataset.lang === guideLanguage));
 }
 
+/* ─── change tracking for Save button ─── */
+let profileSnapshot = null;
+
+function currentProfileValues() {
+  return {
+    fname: document.getElementById('pf-fname').value.trim(),
+    lname: document.getElementById('pf-lname').value.trim(),
+    email: document.getElementById('pf-email').value.trim(),
+    phone: document.getElementById('pf-phone').value.trim(),
+    lang:  guideLanguage,
+  };
+}
+function captureProfileSnapshot() { profileSnapshot = JSON.stringify(currentProfileValues()); }
+function profileChanged()         { return profileSnapshot !== JSON.stringify(currentProfileValues()); }
+function updateSaveState() {
+  const btn = document.getElementById('pf-save');
+  btn.disabled = !profileChanged();
+}
+function hideProfileMsg() { document.getElementById('pf-msg').style.display = 'none'; }
+function showProfileMsg(text, isError) {
+  const el = document.getElementById('pf-msg');
+  el.textContent = text;
+  el.className = 'pf-msg' + (isError ? ' error' : '');
+  el.style.display = 'block';
+  clearTimeout(showProfileMsg._t);
+  showProfileMsg._t = setTimeout(hideProfileMsg, 3000);
+}
+
 async function loadUserProfile() {
   if (!sbUser) return;
+  const meta = sbUser.user_metadata || {};
+  let data = {};
   try {
-    const { data } = await sb.from('profiles').select('*').eq('id', sbUser.id).single();
-    if (!data) return;
-    const fname = data.first_name || '';
-    const lname = data.last_name  || '';
-    document.getElementById('pf-fname').value = fname;
-    document.getElementById('pf-lname').value = lname;
-    document.getElementById('pf-email').value = data.email || sbUser.email || '';
-    document.getElementById('pf-phone').value = data.phone || sbUser.phone || '';
-    guideLanguage = data.guide_language || 'ru';
-    localStorage.setItem('st_lang', guideLanguage);
-    const fullName = [fname, lname].filter(Boolean).join(' ') || 'Пользователь';
-    document.getElementById('pf-display-name').textContent  = fullName;
-    document.getElementById('pf-display-email').textContent = data.email || sbUser.email || '';
-    document.getElementById('pf-avatar').textContent        = (fname[0] || sbUser.email?.[0] || '?').toUpperCase();
-    updateLangButtons();
+    const res = await sb.from('profiles').select('*').eq('id', sbUser.id).single();
+    if (res.data) data = res.data;
   } catch {}
+  // prefer the saved profile row, fall back to sign-up metadata / auth identity
+  const fname = data.first_name || meta.first_name || '';
+  const lname = data.last_name  || meta.last_name  || '';
+  const email = data.email || sbUser.email || '';
+  const phone = data.phone || sbUser.phone || '';
+  document.getElementById('pf-fname').value = fname;
+  document.getElementById('pf-lname').value = lname;
+  document.getElementById('pf-email').value = email;
+  document.getElementById('pf-phone').value = phone;
+  guideLanguage = data.guide_language || guideLanguage || 'ru';
+  localStorage.setItem('st_lang', guideLanguage);
+  const fullName = [fname, lname].filter(Boolean).join(' ') || 'Пользователь';
+  document.getElementById('pf-display-name').textContent  = fullName;
+  document.getElementById('pf-display-email').textContent = email;
+  document.getElementById('pf-avatar').textContent        = (fname[0] || email[0] || '?').toUpperCase();
+  updateLangButtons();
+  captureProfileSnapshot();
+  updateSaveState();
 }
+
+/* mark profile dirty as the user edits */
+['pf-fname','pf-lname','pf-email','pf-phone'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () => { hideProfileMsg(); updateSaveState(); }));
 
 /* ─── profile panel buttons ─── */
 document.getElementById('pf-btn-login').addEventListener('click', () => {
@@ -2854,9 +2930,10 @@ document.getElementById('pf-btn-register').addEventListener('click', () => {
 document.querySelectorAll('.lang-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     guideLanguage = btn.dataset.lang;
-    localStorage.setItem('st_lang', guideLanguage);
+    localStorage.setItem('st_lang', guideLanguage);  // applies to the guide immediately
     updateLangButtons();
-    if (sbUser) sb.from('profiles').update({ guide_language: guideLanguage }).eq('id', sbUser.id);
+    hideProfileMsg();
+    updateSaveState();                                // persists to profile on Save
   });
 });
 
@@ -2872,11 +2949,14 @@ document.getElementById('pf-save').addEventListener('click', async () => {
     updated_at:     new Date().toISOString()
   };
   const { error } = await sb.from('profiles').upsert(row);
-  if (error) { setStatus('Ошибка сохранения', 'error'); return; }
+  if (error) { showProfileMsg('Ошибка сохранения', true); return; }
   const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Пользователь';
-  document.getElementById('pf-display-name').textContent = fullName;
-  if (row.first_name) document.getElementById('pf-avatar').textContent = row.first_name[0].toUpperCase();
-  setStatus('Профиль сохранён ✓', 'info');
+  document.getElementById('pf-display-name').textContent  = fullName;
+  document.getElementById('pf-display-email').textContent = row.email;
+  document.getElementById('pf-avatar').textContent = (row.first_name[0] || row.email[0] || '?').toUpperCase();
+  captureProfileSnapshot();
+  updateSaveState();
+  showProfileMsg('Изменения сохранены ✓');
 });
 
 document.getElementById('pf-signout').addEventListener('click', async () => {
