@@ -1476,8 +1476,10 @@ async function buildStoryPoints() {
   const SEARCH_RADIUS = 500;   // m — wide net to find more candidates
   const SNAP_MAX      = 350;   // m — max distance from route to be included
   const MIN_GAP       = 200;   // m — minimum spacing between selected points
-  const MAX_POINTS    = 12;
-  const PROBES        = 24;    // sample points along the route
+  // dynamic: ~1 point per MIN_GAP metres, floor 5, cap 30
+  const MAX_POINTS    = Math.min(30, Math.max(5, Math.floor(routeDistance / MIN_GAP)));
+  // dynamic: ~1 probe per 400m, floor 16, cap 48
+  const PROBES        = Math.min(48, Math.max(16, Math.ceil(routeDistance / 400)));
 
   // ── 1. collect all Wikipedia articles near the route ──────────────────────
   const probes = sampleAlongRoute(PROBES);
@@ -1501,7 +1503,7 @@ async function buildStoryPoints() {
       return { title: a.title, lat: s.lat, lng: s.lng, order: routeOrderIndex(a.lat, a.lng) };
     })
     .filter(Boolean);
-  console.log(`story points: ${candidates.length} found, ${onRoute.length} on route`);
+  console.log(`story points: route=${routeDistance}m → limit=${MAX_POINTS}, probes=${PROBES}; found=${candidates.length}, on route=${onRoute.length}`);
 
   // ── 3. fetch summaries for all candidates in parallel ─────────────────────
   const withSummary = (await Promise.all(
