@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST')    { res.status(405).end(); return; }
 
-  const { routeDescription, routeDistance = 2000, transportMode = 'foot', storyPoints = [] } = req.body || {};
+  const { routeDescription, routeDistance = 2000, transportMode = 'foot', storyPoints = [], guideLanguage = 'ru' } = req.body || {};
   if (!routeDescription) { res.status(400).json({ error: 'routeDescription required' }); return; }
 
   const API_KEY   = process.env.YANDEX_GPT_KEY;
@@ -105,8 +105,17 @@ module.exports = async (req, res) => {
 — Легенды и предания — только с оговоркой "по преданию", "рассказывают, что".
 — Лучше честно описать характер места, чем придумать несуществующий объект.`;
 
+  // ─── LANGUAGE ──────────────────────────────────────────────────────────────
+  const LANG_MAP = {
+    en: 'IMPORTANT: Write the entire audio guide in English.',
+    zh: 'ВАЖНО: Весь текст аудиогида пиши на китайском языке (упрощённое письмо, путунхуа).',
+    de: 'ВАЖНО: Весь текст аудиогида пиши на немецком языке.',
+    fr: 'ВАЖНО: Весь текст аудиогида пиши на французском языке.',
+  };
+  const LANG_INSTRUCTION = LANG_MAP[guideLanguage] || '';
+
   // ─── FORMAT ────────────────────────────────────────────────────────────────
-  const FORMAT = `Оформление: абзацы через пустую строку, 3–5 предложений в каждом. Только чистый текст — никакого markdown, звёздочек, решёток, нумерованных списков.`;
+  const FORMAT = `Оформление: абзацы через пустую строку, 3–5 предложений в каждом. Только чистый текст — никакого markdown, звёздочек, решёток, нумерованных списков.${LANG_INSTRUCTION ? '\n' + LANG_INSTRUCTION : ''}`;
 
   let text = '';
 
