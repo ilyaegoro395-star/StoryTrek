@@ -1307,7 +1307,7 @@ async function wikiSummary(title) {
     if (!r.ok) return null;
     const d = await r.json();
     return {
-      photoUrl:    d.thumbnail ? d.thumbnail.source.replace(/\/\d+px-/, '/440px-') : null,
+      photoUrl:    d.thumbnail ? d.thumbnail.source : null,
       extract:     d.extract     || '',
       description: d.description || ''   // Wikidata short desc, e.g. "православный храм в Москве"
     };
@@ -1442,7 +1442,7 @@ function drawStoryMarkers(points) {
   points.forEach((pt, i) => {
     const layout = makeStoryLayout(i + 1);
     const photoHtml = pt.photoUrl
-      ? `<img src="${pt.photoUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" loading="eager" decoding="sync" style="width:220px;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;background:#E2EEF6">`
+      ? `<img src="${pt.photoUrl}" referrerpolicy="no-referrer" loading="eager" style="width:220px;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;background:#E2EEF6">`
       : '';
     const m = new ymaps.Placemark(
       [pt.lat, pt.lng],
@@ -1535,7 +1535,6 @@ async function buildStoryPoints() {
     if (p.sum.photoUrl) {
       const img = new Image();
       img.referrerPolicy = 'no-referrer';
-      img.crossOrigin = 'anonymous';
       img.src = p.sum.photoUrl;
     }
     return { name: p.title, lat: p.lat, lng: p.lng,
