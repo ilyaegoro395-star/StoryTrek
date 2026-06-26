@@ -793,9 +793,10 @@ function openPanel(which) {
   document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.add('active');
   document.getElementById(which === 'route' ? 'nav-explore' : 'nav-route').classList.remove('active');
   if (which === 'explore') {
-    if (myCity && !exploreCity) {
-      exploreCity = myCity;
-      document.getElementById('explore-city').value = myCity;
+    const cityEl = document.getElementById('explore-city');
+    if (myCity && !cityEl.value && !exploreCityCoords) {
+      cityEl.value = myCity;
+      // don't set exploreCityCoords — myPos fallback is used in getCatalogFiltered
     }
     renderCatalog();
   }
@@ -1859,22 +1860,49 @@ const CATALOG = [
     ]},
 ];
 
-let exploreCity  = '';
-let exploreMaxKm = 0;
-const catalogPhotoCache = {};   // routeId → photoUrl | null
+let exploreMaxKm    = 0;
+let exploreCityCoords = null;  // {lat, lng} of the city the user searched for
+const catalogPhotoCache = {};  // routeId → photoUrl | null
 
-function renderCatalog() {
-  const cardsEl = document.getElementById('explore-cards');
-  const city = exploreCity.trim().toLowerCase();
-  const filtered = CATALOG.filter(r => {
-    if (city && !r.city.toLowerCase().includes(city)) return false;
+/* filter routes by proximity to a set of coords (80 km radius) */
+function getCatalogFiltered() {
+  const ref = exploreCityCoords || (myPos ? { lat: myPos.lat, lng: myPos.lng } : null);
+  return CATALOG.filter(r => {
+    if (ref) {
+      const near = r.points.some(p =>
+        haversine([p.lat, p.lng], [ref.lat, ref.lng]) <= 80000);
+      if (!near) return false;
+    }
     if (exploreMaxKm > 0 && r.distKm > exploreMaxKm) return false;
     return true;
   });
-  if (filtered.length === 0) {
-    cardsEl.innerHTML = '<div style="color:#4a5568;text-align:center;padding:24px 0">Маршруты не найдены</div>';
+}
+
+function renderCatalog() {
+  const cardsEl = document.getElementById('explore-cards');
+  const ref = exploreCityCoords || (myPos ? { lat: myPos.lat, lng: myPos.lng } : null);
+
+  if (!ref) {
+    cardsEl.innerHTML =
+      `<div style="text-align:center;padding:32px 16px;color:var(--text-2);line-height:1.6">
+        <div style="font-size:32px;margin-bottom:10px">🗺️</div>
+        <div style="font-weight:600;color:var(--text-1);margin-bottom:6px">Выберите город</div>
+        <div style="font-size:13px">Введите название города, чтобы увидеть готовые маршруты</div>
+      </div>`;
     return;
   }
+
+  const filtered = getCatalogFiltered();
+  if (filtered.length === 0) {
+    cardsEl.innerHTML =
+      `<div style="text-align:center;padding:32px 16px;color:var(--text-2);line-height:1.6">
+        <div style="font-size:32px;margin-bottom:10px">🔍</div>
+        <div style="font-weight:600;color:var(--text-1);margin-bottom:6px">Маршрутов пока нет</div>
+        <div style="font-size:13px">Для этого города ещё нет готовых маршрутов.<br>Постройте свой во вкладке «Маршрут»!</div>
+      </div>`;
+    return;
+  }
+
   cardsEl.innerHTML = filtered.map(r => {
     const dist = r.distKm >= 1 ? `${r.distKm} км` : `${r.distKm * 1000} м`;
     const dur  = r.durationMin >= 60
@@ -1883,8 +1911,7 @@ function renderCatalog() {
     const mode = r.type === 'foot' ? '🚶 Пешком' : '🚲 Велосипед';
     const cachedPhoto = catalogPhotoCache[r.id];
     const photoHtml = cachedPhoto
-      ? `<img src="${cachedPhoto}" referrerpolicy="no-referrer" loading="eager">`
-      : '';
+      ? `<img src="${cachedPhoto}" referrerpolicy="no-referrer" loading="eager">` : '';
     return `<div class="ec-card" onclick="loadCatalogRoute('${r.id}')">
       <div class="ec-img" id="ec-img-${r.id}" style="background:${r.color}">
         ${photoHtml}<span class="ec-emoji">${r.emoji}</span>
@@ -1901,10 +1928,9 @@ function renderCatalog() {
     </div>`;
   }).join('');
 
-  // async: load photos for cards that don't have one yet
   filtered.forEach(r => {
     if (catalogPhotoCache[r.id] !== undefined) return;
-    catalogPhotoCache[r.id] = null;  // mark as loading
+    catalogPhotoCache[r.id] = null;
     fetchCatalogPhoto(r);
   });
 }
@@ -1956,37 +1982,47 @@ function loadCatalogRoute(id) {
   buildRoute();
 }
 
-/* ─── city autocomplete ─── */
-const CATALOG_CITIES = [...new Set(CATALOG.map(r => r.city))].sort();
-
+/* ─── city autocomplete (geocode API) ─── */
 const exploreCityInput = document.getElementById('explore-city');
 const citySugEl        = document.getElementById('city-sug');
+let citySearchTimer    = null;
 
-function showCitySug(val) {
-  const q = val.trim().toLowerCase();
-  const matches = q.length === 0
-    ? CATALOG_CITIES                                          // empty → show all
-    : CATALOG_CITIES.filter(c => c.toLowerCase().includes(q));
-  if (!matches.length) { citySugEl.style.display = 'none'; return; }
-  citySugEl.innerHTML = matches
-    .map(c => `<div data-city="${c}">${c}</div>`).join('');
-  citySugEl.style.display = 'block';
+async function fetchCitySuggestions(val) {
+  const q = val.trim();
+  if (q.length < 2) { citySugEl.style.display = 'none'; return; }
+  try {
+    const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+    if (!r.ok) return;
+    const items = await r.json();
+    if (!Array.isArray(items) || !items.length) { citySugEl.style.display = 'none'; return; }
+    citySugEl.innerHTML = items
+      .map(c => `<div data-lat="${c.lat}" data-lng="${c.lng}">${c.text}</div>`)
+      .join('');
+    citySugEl.style.display = 'block';
+  } catch { citySugEl.style.display = 'none'; }
 }
 
-exploreCityInput.addEventListener('focus', e => showCitySug(e.target.value));
 exploreCityInput.addEventListener('input', e => {
-  exploreCity = e.target.value;
-  showCitySug(e.target.value);
-  renderCatalog();
+  clearTimeout(citySearchTimer);
+  const val = e.target.value;
+  if (!val.trim()) {
+    exploreCityCoords = null;
+    citySugEl.style.display = 'none';
+    renderCatalog();
+    return;
+  }
+  citySearchTimer = setTimeout(() => fetchCitySuggestions(val), 300);
 });
+
 exploreCityInput.addEventListener('blur', () => {
   setTimeout(() => { citySugEl.style.display = 'none'; }, 150);
 });
+
 citySugEl.addEventListener('mousedown', e => {
-  const city = e.target.dataset.city;
-  if (!city) return;
-  exploreCityInput.value = city;
-  exploreCity = city;
+  const div = e.target.closest('[data-lat]');
+  if (!div) return;
+  exploreCityInput.value = div.textContent;
+  exploreCityCoords = { lat: parseFloat(div.dataset.lat), lng: parseFloat(div.dataset.lng) };
   citySugEl.style.display = 'none';
   renderCatalog();
 });
