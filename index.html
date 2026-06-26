@@ -466,6 +466,208 @@ html, body {
   box-shadow: 0 0 6px var(--accent);
 }
 
+/* ── profile panel (bottom sheet, same pattern as #card) ── */
+#profile-panel {
+  position: fixed;
+  bottom: var(--nav-h); left: 0; right: 0;
+  z-index: 20;
+  max-height: calc(82vh - var(--nav-h));
+  background: var(--panel);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  border: 1px solid var(--border-hi);
+  border-bottom: none;
+  transform: translateY(100%);
+  transition: transform .35s cubic-bezier(.32,1,.5,1), opacity .25s;
+  opacity: 0;
+  display: flex; flex-direction: column;
+  pointer-events: none;
+}
+#profile-panel.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* profile: guest view */
+.pf-guest-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 32px 16px 16px; text-align: center; gap: 12px;
+}
+.pf-guest-icon { color: var(--text-3); }
+.pf-guest-text { font-size: 14px; color: var(--text-2); line-height: 1.5; max-width: 260px; }
+.pf-action-btn {
+  width: 100%; padding: 13px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: opacity .15s;
+}
+.pf-action-btn:hover { opacity: .9; }
+.pf-action-btn--secondary {
+  background: var(--accent-dim); color: var(--accent);
+}
+
+/* profile: logged-in view */
+.pf-user-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 4px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.pf-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #0284C7);
+  color: #fff; font-size: 20px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pf-user-name { font-size: 15px; font-weight: 600; color: var(--text-1); }
+.pf-user-email { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.pf-section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+  text-transform: uppercase; color: var(--text-3);
+  margin: 16px 0 8px;
+}
+.pf-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.pf-row .addr-input { flex: 1; margin-bottom: 0; }
+#pf-user .addr-input { margin-bottom: 8px; }
+#lang-selector {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;
+}
+.lang-btn {
+  padding: 8px 14px;
+  border: 1.5px solid var(--border-hi);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-2); font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: all .15s;
+}
+.lang-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pf-signout-btn {
+  width: 100%; margin-top: 12px; padding: 12px;
+  background: none; border: 1.5px solid rgba(239,68,68,.3);
+  border-radius: 12px; color: var(--red);
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background .15s;
+}
+.pf-signout-btn:hover { background: rgba(239,68,68,.06); }
+
+/* ── auth overlay (full-screen modal) ── */
+#auth-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(12,42,62,.72);
+  backdrop-filter: blur(10px);
+  display: flex; align-items: flex-end;
+  transition: opacity .3s, visibility .3s;
+  visibility: visible; opacity: 1;
+}
+#auth-overlay.hidden {
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+#auth-overlay.hidden #auth-modal {
+  transform: translateY(60px);
+}
+#auth-modal {
+  background: var(--panel);
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  padding: 28px 20px calc(28px + env(safe-area-inset-bottom, 0));
+  max-height: 92vh; overflow-y: auto;
+  transition: transform .35s cubic-bezier(.32,1,.5,1);
+}
+.auth-logo {
+  font-size: 22px; font-weight: 800; color: var(--text-1);
+  letter-spacing: -.5px; margin-bottom: 4px;
+}
+.auth-logo span { color: var(--accent); }
+.auth-subtitle {
+  font-size: 13px; color: var(--text-2); margin-bottom: 20px;
+}
+.auth-tabs {
+  display: flex; gap: 6px; margin-bottom: 20px;
+  background: var(--input-bg); border-radius: 12px; padding: 4px;
+}
+.auth-tab {
+  flex: 1; padding: 9px;
+  background: none; border: none; border-radius: 9px;
+  font-size: 13px; font-weight: 600; color: var(--text-2); font-family: inherit;
+  cursor: pointer; transition: all .2s;
+}
+.auth-tab.active {
+  background: var(--panel); color: var(--accent);
+  box-shadow: 0 1px 6px rgba(0,0,0,.08);
+}
+.auth-form-group { margin-bottom: 10px; }
+.auth-input {
+  width: 100%; padding: 13px 14px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  font-size: 15px; color: var(--text-1); font-family: inherit;
+  outline: none; transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.auth-input:focus { border-color: var(--accent); }
+.auth-otp-input {
+  letter-spacing: 6px; font-size: 22px; font-weight: 700;
+  text-align: center;
+}
+.auth-btn {
+  width: 100%; padding: 14px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: opacity .15s; margin-top: 2px;
+}
+.auth-btn:hover { opacity: .9; }
+.auth-btn:active { opacity: .8; }
+.auth-btn-alt {
+  width: 100%; padding: 12px; margin-top: 8px;
+  background: none; border: 1.5px solid var(--border-hi);
+  border-radius: 12px; color: var(--text-2);
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  cursor: pointer;
+}
+.auth-hint {
+  font-size: 13px; color: var(--text-2); margin-bottom: 10px; text-align: center;
+}
+.auth-mode-switch {
+  display: flex; gap: 6px; margin-bottom: 14px;
+  background: var(--input-bg); border-radius: 10px; padding: 3px;
+}
+.auth-mode-btn {
+  flex: 1; padding: 8px;
+  background: none; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: var(--text-2); font-family: inherit;
+  cursor: pointer; transition: all .2s;
+}
+.auth-mode-btn.active {
+  background: var(--panel); color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+.auth-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.auth-row .auth-input { flex: 1; }
+.auth-error {
+  padding: 10px 12px; margin: 10px 0 0;
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 10px;
+  font-size: 13px; color: var(--red);
+}
+.auth-skip-btn {
+  width: 100%; padding: 13px; margin-top: 14px;
+  background: none; border: none;
+  font-size: 13px; color: var(--text-2); font-family: inherit;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.auth-loader {
+  text-align: center; padding: 8px; color: var(--text-2); font-size: 13px;
+}
+
 /* ── position marker ── */
 @keyframes pos-pulse {
   0%   { transform:scale(1);   opacity:.7 }
@@ -572,6 +774,128 @@ html, body {
   <button id="mpp-done">Готово</button>
 </div>
 
+<!-- auth overlay -->
+<div id="auth-overlay" class="hidden">
+  <div id="auth-modal">
+    <div class="auth-logo">Story<span>Trek</span></div>
+    <div class="auth-subtitle">Сохраняйте маршруты и слушайте гид на своём языке</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="phone">📱 Телефон</button>
+      <button class="auth-tab" data-tab="email">✉️ Email</button>
+    </div>
+
+    <!-- Phone OTP -->
+    <div id="auth-tab-phone">
+      <div id="phone-step1">
+        <div class="auth-form-group">
+          <input id="auth-phone" class="auth-input" type="tel" placeholder="+7 999 123 45 67" autocomplete="tel">
+        </div>
+        <button id="auth-send-sms" class="auth-btn">Получить SMS код</button>
+      </div>
+      <div id="phone-step2" style="display:none">
+        <div id="auth-phone-hint" class="auth-hint"></div>
+        <div class="auth-form-group">
+          <input id="auth-otp" class="auth-input auth-otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+        </div>
+        <button id="auth-verify-otp" class="auth-btn">Войти</button>
+        <button id="auth-back-phone" class="auth-btn-alt">← Изменить номер</button>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div id="auth-tab-email" style="display:none">
+      <div class="auth-mode-switch">
+        <button class="auth-mode-btn active" data-mode="login">Войти</button>
+        <button class="auth-mode-btn" data-mode="register">Регистрация</button>
+      </div>
+      <div id="email-login-form">
+        <div class="auth-form-group">
+          <input id="auth-login-email" class="auth-input" type="email" placeholder="Email" autocomplete="email">
+        </div>
+        <div class="auth-form-group">
+          <input id="auth-login-pass" class="auth-input" type="password" placeholder="Пароль" autocomplete="current-password">
+        </div>
+        <button id="auth-do-login" class="auth-btn">Войти</button>
+      </div>
+      <div id="email-register-form" style="display:none">
+        <div class="auth-row">
+          <input id="auth-reg-fname" class="auth-input" type="text" placeholder="Имя" autocomplete="given-name">
+          <input id="auth-reg-lname" class="auth-input" type="text" placeholder="Фамилия" autocomplete="family-name">
+        </div>
+        <div class="auth-form-group">
+          <input id="auth-reg-email" class="auth-input" type="email" placeholder="Email" autocomplete="email">
+        </div>
+        <div class="auth-form-group">
+          <input id="auth-reg-pass" class="auth-input" type="password" placeholder="Пароль (мин. 6 символов)" autocomplete="new-password">
+        </div>
+        <button id="auth-do-register" class="auth-btn">Создать аккаунт</button>
+      </div>
+    </div>
+
+    <div id="auth-error" class="auth-error" style="display:none"></div>
+    <div id="auth-loader" class="auth-loader" style="display:none">Загрузка…</div>
+
+    <button id="auth-skip" class="auth-skip-btn">Продолжить без регистрации →</button>
+  </div>
+</div>
+
+<!-- profile panel (bottom sheet) -->
+<div id="profile-panel">
+  <div class="sheet-handle" id="profile-handle"></div>
+  <div class="card-head">
+    <div class="logo">Профиль</div>
+  </div>
+  <div class="card-body" id="profile-body" style="overflow-y:auto">
+
+    <!-- guest -->
+    <div id="pf-guest">
+      <div class="pf-guest-wrap">
+        <div class="pf-guest-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="56" height="56">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+        </div>
+        <p class="pf-guest-text">Войдите, чтобы сохранять маршруты и настраивать язык аудиогида</p>
+        <button id="pf-btn-login" class="pf-action-btn">Войти</button>
+        <button id="pf-btn-register" class="pf-action-btn pf-action-btn--secondary">Зарегистрироваться</button>
+      </div>
+    </div>
+
+    <!-- logged in -->
+    <div id="pf-user" style="display:none">
+      <div class="pf-user-header">
+        <div class="pf-avatar" id="pf-avatar">?</div>
+        <div>
+          <div class="pf-user-name" id="pf-display-name">Пользователь</div>
+          <div class="pf-user-email" id="pf-display-email"></div>
+        </div>
+      </div>
+
+      <div class="pf-section-title">Личные данные</div>
+      <div class="pf-row">
+        <input id="pf-fname" class="addr-input" type="text" placeholder="Имя" autocomplete="given-name">
+        <input id="pf-lname" class="addr-input" type="text" placeholder="Фамилия" autocomplete="family-name">
+      </div>
+      <input id="pf-email" class="addr-input" type="email" placeholder="Email" autocomplete="email" style="margin-bottom:8px">
+      <input id="pf-phone" class="addr-input" type="tel" placeholder="Телефон" autocomplete="tel" style="margin-bottom:8px">
+
+      <div class="pf-section-title">Язык аудиогида</div>
+      <div id="lang-selector">
+        <button class="lang-btn active" data-lang="ru">🇷🇺 Русский</button>
+        <button class="lang-btn" data-lang="en">🇬🇧 English</button>
+        <button class="lang-btn" data-lang="zh">🇨🇳 中文</button>
+        <button class="lang-btn" data-lang="de">🇩🇪 Deutsch</button>
+        <button class="lang-btn" data-lang="fr">🇫🇷 Français</button>
+      </div>
+
+      <button id="pf-save" class="auth-btn" style="margin-top:20px">Сохранить</button>
+      <button id="pf-signout" class="pf-signout-btn">Выйти из аккаунта</button>
+    </div>
+
+  </div>
+</div>
+
 <!-- bottom navigation bar -->
 <nav id="bottom-nav">
   <button class="nav-icon" id="nav-route">
@@ -589,14 +913,17 @@ html, body {
     </svg>
     <span class="nav-lbl">Маршруты</span>
   </button>
-  <button class="nav-icon" id="nav-saved">
+  <button class="nav-icon" id="nav-profile">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
     </svg>
-    <span class="nav-lbl">Сохранённые</span>
+    <span class="nav-lbl" id="nav-profile-lbl">Профиль</span>
+    <span id="nav-profile-dot" style="display:none;position:absolute;top:7px;right:calc(50% - 13px);width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 4px var(--accent)"></span>
   </button>
 </nav>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
 'use strict';
@@ -658,6 +985,7 @@ ymaps.ready(() => {
   ymap.controls.get('zoomControl').options.set({ position: { right: 14, top: 80 } });
   startPosWatch();
   renderWaypointList();
+  initAuth();
 
   ymap.events.add('boundschange', () => {
     if (mapPickIdx < 0) return;
@@ -767,6 +1095,7 @@ function updateFab() {
   let panelH = 0;
   if (card.classList.contains('open'))              panelH = card.offsetHeight;
   else if (explorePanel.classList.contains('open')) panelH = explorePanel.offsetHeight;
+  else if (profilePanel && profilePanel.classList.contains('open')) panelH = profilePanel.offsetHeight;
   fab.style.bottom = (NAV_H + panelH + 14) + 'px';
 }
 new ResizeObserver(updateFab).observe(card);
@@ -790,6 +1119,7 @@ function openPanel(which) {
   el.classList.add('open');
   el.classList.remove('peek');
   other.classList.remove('open', 'peek');
+  if (profilePanel) { profilePanel.classList.remove('open'); document.getElementById('nav-profile').classList.remove('active'); }
   document.getElementById(which === 'route' ? 'nav-route' : 'nav-explore').classList.add('active');
   document.getElementById(which === 'route' ? 'nav-explore' : 'nav-route').classList.remove('active');
   if (which === 'explore') {
@@ -864,9 +1194,7 @@ document.getElementById('nav-explore').addEventListener('click', () => {
   if (explorePanel.classList.contains('open')) hidePanel('explore');
   else openPanel('explore');
 });
-document.getElementById('nav-saved').addEventListener('click', () => {
-  setStatus('Сохранённые маршруты — скоро', 'info');
-});
+/* nav-profile handled in auth/profile section below */
 
 /* panels start fully hidden — open on nav icon tap */
 
@@ -1620,6 +1948,7 @@ async function generateGuide() {
         ).join('\n'),
         routeDistance,
         transportMode,
+        guideLanguage,
         // real objects found along the route + their Wikipedia facts — the guide is built from these
         storyPoints: currentStoryPoints.map(p => ({ name: p.name, facts: p.story }))
       }),
@@ -2353,6 +2682,267 @@ document.getElementById('dist-filter').addEventListener('click', e => {
   exploreMaxKm = parseInt(btn.dataset.km);
   renderCatalog();
 });
+
+/* ═══════════════════════════════════════════════════════════
+   SUPABASE / AUTH / PROFILE
+   ═══════════════════════════════════════════════════════════ */
+
+const SUPABASE_URL = 'https://padzbdpbmdryltmlbdxw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YzCEgbmIYTTYfTLTpBeZAA_yfDgvpkS';
+const sb           = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let sbUser        = null;
+let guideLanguage = localStorage.getItem('st_lang') || 'ru';
+
+const profilePanel = document.getElementById('profile-panel');
+
+/* ─── profile panel open / hide ─── */
+function openProfilePanel() {
+  card.classList.remove('open', 'peek');
+  explorePanel.classList.remove('open', 'peek');
+  document.getElementById('nav-route').classList.remove('active');
+  document.getElementById('nav-explore').classList.remove('active');
+  profilePanel.classList.add('open');
+  document.getElementById('nav-profile').classList.add('active');
+  renderProfilePanel();
+  updateFab();
+}
+
+function hideProfilePanel() {
+  profilePanel.classList.remove('open');
+  document.getElementById('nav-profile').classList.remove('active');
+  updateFab();
+}
+
+document.getElementById('nav-profile').addEventListener('click', () => {
+  if (profilePanel.classList.contains('open')) hideProfilePanel();
+  else openProfilePanel();
+});
+
+addPanelSwipe(profilePanel, document.getElementById('profile-handle'), 'profile');
+
+/* ─── auth modal helpers ─── */
+function showAuthModal(defaultTab = 'phone') {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  switchAuthTab(defaultTab);
+  clearAuthUI();
+}
+
+function hideAuthModal() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+  localStorage.setItem('st_visited', '1');
+}
+
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('auth-tab-phone').style.display = tab === 'phone' ? 'block' : 'none';
+  document.getElementById('auth-tab-email').style.display = tab === 'email' ? 'block' : 'none';
+}
+
+function switchEmailMode(mode) {
+  document.querySelectorAll('.auth-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('email-login-form').style.display  = mode === 'login'    ? 'block' : 'none';
+  document.getElementById('email-register-form').style.display = mode === 'register' ? 'block' : 'none';
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function clearAuthUI() {
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-loader').style.display = 'none';
+}
+
+function setAuthLoading(on) {
+  document.getElementById('auth-loader').style.display = on ? 'block' : 'none';
+  document.getElementById('auth-error').style.display  = 'none';
+}
+
+/* ─── auth tab / mode switches ─── */
+document.querySelectorAll('.auth-tab').forEach(btn =>
+  btn.addEventListener('click', () => switchAuthTab(btn.dataset.tab)));
+
+document.querySelectorAll('.auth-mode-btn').forEach(btn =>
+  btn.addEventListener('click', () => switchEmailMode(btn.dataset.mode)));
+
+/* ─── phone OTP flow ─── */
+document.getElementById('auth-send-sms').addEventListener('click', async () => {
+  const phone = document.getElementById('auth-phone').value.trim();
+  if (!phone) { showAuthError('Введите номер телефона'); return; }
+  setAuthLoading(true);
+  const { error } = await sb.auth.signInWithOtp({ phone });
+  setAuthLoading(false);
+  if (error) { showAuthError(error.message); return; }
+  document.getElementById('phone-step1').style.display = 'none';
+  document.getElementById('phone-step2').style.display = 'block';
+  document.getElementById('auth-phone-hint').textContent = `Код отправлен на ${phone}`;
+});
+
+document.getElementById('auth-verify-otp').addEventListener('click', async () => {
+  const phone = document.getElementById('auth-phone').value.trim();
+  const token = document.getElementById('auth-otp').value.trim();
+  if (!token) { showAuthError('Введите код из SMS'); return; }
+  setAuthLoading(true);
+  const { error } = await sb.auth.verifyOtp({ phone, token, type: 'sms' });
+  setAuthLoading(false);
+  if (error) { showAuthError(error.message); return; }
+  hideAuthModal();
+});
+
+document.getElementById('auth-back-phone').addEventListener('click', () => {
+  document.getElementById('phone-step1').style.display = 'block';
+  document.getElementById('phone-step2').style.display = 'none';
+  document.getElementById('auth-otp').value = '';
+  clearAuthUI();
+});
+
+/* ─── email login ─── */
+document.getElementById('auth-do-login').addEventListener('click', async () => {
+  const email = document.getElementById('auth-login-email').value.trim();
+  const pass  = document.getElementById('auth-login-pass').value;
+  if (!email || !pass) { showAuthError('Введите email и пароль'); return; }
+  setAuthLoading(true);
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  setAuthLoading(false);
+  if (error) { showAuthError(error.message === 'Invalid login credentials' ? 'Неверный email или пароль' : error.message); return; }
+  hideAuthModal();
+});
+
+/* ─── email registration ─── */
+document.getElementById('auth-do-register').addEventListener('click', async () => {
+  const fname = document.getElementById('auth-reg-fname').value.trim();
+  const lname = document.getElementById('auth-reg-lname').value.trim();
+  const email = document.getElementById('auth-reg-email').value.trim();
+  const pass  = document.getElementById('auth-reg-pass').value;
+  if (!email || !pass) { showAuthError('Введите email и пароль'); return; }
+  if (pass.length < 6) { showAuthError('Пароль — минимум 6 символов'); return; }
+  setAuthLoading(true);
+  const { data, error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { first_name: fname, last_name: lname } }
+  });
+  setAuthLoading(false);
+  if (error) { showAuthError(error.message); return; }
+  if (data.user) {
+    await sb.from('profiles').upsert({ id: data.user.id, first_name: fname, last_name: lname, email });
+  }
+  hideAuthModal();
+  setStatus('Аккаунт создан! Проверьте email для подтверждения.', 'info');
+});
+
+document.getElementById('auth-skip').addEventListener('click', hideAuthModal);
+
+/* ─── profile panel rendering ─── */
+function renderProfilePanel() {
+  document.getElementById('pf-guest').style.display = sbUser ? 'none' : 'block';
+  document.getElementById('pf-user').style.display  = sbUser ? 'block' : 'none';
+  updateLangButtons();
+}
+
+function updateNavProfileState() {
+  const dot = document.getElementById('nav-profile-dot');
+  const lbl = document.getElementById('nav-profile-lbl');
+  if (dot) dot.style.display = sbUser ? 'block' : 'none';
+  if (lbl) lbl.textContent   = sbUser ? 'Кабинет' : 'Профиль';
+}
+
+function updateLangButtons() {
+  document.querySelectorAll('.lang-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.lang === guideLanguage));
+}
+
+async function loadUserProfile() {
+  if (!sbUser) return;
+  try {
+    const { data } = await sb.from('profiles').select('*').eq('id', sbUser.id).single();
+    if (!data) return;
+    const fname = data.first_name || '';
+    const lname = data.last_name  || '';
+    document.getElementById('pf-fname').value = fname;
+    document.getElementById('pf-lname').value = lname;
+    document.getElementById('pf-email').value = data.email || sbUser.email || '';
+    document.getElementById('pf-phone').value = data.phone || sbUser.phone || '';
+    guideLanguage = data.guide_language || 'ru';
+    localStorage.setItem('st_lang', guideLanguage);
+    const fullName = [fname, lname].filter(Boolean).join(' ') || 'Пользователь';
+    document.getElementById('pf-display-name').textContent  = fullName;
+    document.getElementById('pf-display-email').textContent = data.email || sbUser.email || '';
+    document.getElementById('pf-avatar').textContent        = (fname[0] || sbUser.email?.[0] || '?').toUpperCase();
+    updateLangButtons();
+  } catch {}
+}
+
+/* ─── profile panel buttons ─── */
+document.getElementById('pf-btn-login').addEventListener('click', () => {
+  hideProfilePanel();
+  showAuthModal('email');
+  switchEmailMode('login');
+});
+
+document.getElementById('pf-btn-register').addEventListener('click', () => {
+  hideProfilePanel();
+  showAuthModal('email');
+  switchEmailMode('register');
+});
+
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    guideLanguage = btn.dataset.lang;
+    localStorage.setItem('st_lang', guideLanguage);
+    updateLangButtons();
+    if (sbUser) sb.from('profiles').update({ guide_language: guideLanguage }).eq('id', sbUser.id);
+  });
+});
+
+document.getElementById('pf-save').addEventListener('click', async () => {
+  if (!sbUser) return;
+  const row = {
+    id:             sbUser.id,
+    first_name:     document.getElementById('pf-fname').value.trim(),
+    last_name:      document.getElementById('pf-lname').value.trim(),
+    email:          document.getElementById('pf-email').value.trim(),
+    phone:          document.getElementById('pf-phone').value.trim(),
+    guide_language: guideLanguage,
+    updated_at:     new Date().toISOString()
+  };
+  const { error } = await sb.from('profiles').upsert(row);
+  if (error) { setStatus('Ошибка сохранения', 'error'); return; }
+  const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Пользователь';
+  document.getElementById('pf-display-name').textContent = fullName;
+  if (row.first_name) document.getElementById('pf-avatar').textContent = row.first_name[0].toUpperCase();
+  setStatus('Профиль сохранён ✓', 'info');
+});
+
+document.getElementById('pf-signout').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  sbUser = null;
+  hideProfilePanel();
+  updateNavProfileState();
+  setStatus('Вы вышли из аккаунта', 'info');
+});
+
+/* ─── Supabase init ─── */
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  sbUser = session?.user || null;
+  if (sbUser) await loadUserProfile();
+  updateNavProfileState();
+
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    const hadUser = !!sbUser;
+    sbUser = session?.user || null;
+    if (sbUser && !hadUser) await loadUserProfile();
+    updateNavProfileState();
+    if (profilePanel.classList.contains('open')) renderProfilePanel();
+  });
+
+  // first visit → show auth modal after map is ready
+  if (!localStorage.getItem('st_visited') && !sbUser) {
+    setTimeout(showAuthModal, 900);
+  }
+}
 
 /* ─── status ─── */
 function setStatus(msg, type = '') {
