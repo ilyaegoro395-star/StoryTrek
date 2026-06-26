@@ -1,76 +1,111 @@
 const https = require('https');
 
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders() };
-  if (event.httpMethod !== 'POST')    return { statusCode: 405, body: 'Method Not Allowed' };
+// SpeechKit v1: documented 5000-byte limit per request
+// Russian char = 2 UTF-8 bytes → safe limit is ~2000 chars
+const MAX_CHARS = 1500;
 
-  const { text, voice = 'alena', speed = '0.9' } = JSON.parse(event.body || '{}');
-  if (!text) return { statusCode: 400, body: JSON.stringify({ error: 'text required' }) };
+function splitToChunks(text) {
+  if (text.length <= MAX_CHARS) return [text];
 
-  const API_KEY   = process.env.YANDEX_SPEECHKIT_KEY;
-  const FOLDER_ID = process.env.YANDEX_FOLDER_ID;
+  const chunks = [];
+  const sentences = text.split(/(?<=[.!?…])\s+/);
+  let current = '';
 
-  const body = JSON.stringify({
-    text: text.slice(0, 5000),
-    outputAudioSpec: { containerAudio: { containerAudioType: 'MP3' } },
-    hints: [
-      { voice },
-      { role: 'good' },
-      { speed: parseFloat(speed) }
-    ],
-    folderId: FOLDER_ID
-  });
+  for (const s of sentences) {
+    const candidate = current ? current + ' ' + s : s;
+    if (candidate.length > MAX_CHARS && current) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
 
+  // Hard fallback: slice any chunk still over the limit
+  const safe = [];
+  for (const chunk of chunks) {
+    if (chunk.length <= MAX_CHARS) {
+      safe.push(chunk);
+    } else {
+      for (let i = 0; i < chunk.length; i += MAX_CHARS) {
+        safe.push(chunk.slice(i, i + MAX_CHARS));
+      }
+    }
+  }
+  return safe.length ? safe : [text.slice(0, MAX_CHARS)];
+}
+
+function synthesizeChunk(text, voice, speed, lang, apiKey, folderId) {
   return new Promise((resolve) => {
+    const params = new URLSearchParams({
+      text,
+      lang,
+      voice,
+      format:   'mp3',
+      speed:    String(speed),
+      folderId
+    });
+    const body = params.toString();
+
     const options = {
       hostname: 'tts.api.cloud.yandex.net',
-      path: '/tts/v3/utteranceSynthesis',
-      method: 'POST',
-      headers: {
-        'Authorization': `Api-Key ${API_KEY}`,
-        'Content-Type': 'application/json',
+      path:     '/speech/v1/tts:synthesize',
+      method:   'POST',
+      headers:  {
+        'Authorization': `Api-Key ${apiKey}`,
+        'Content-Type':  'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(body)
       }
     };
 
-    const req = https.request(options, (res) => {
+    const req = https.request(options, (r) => {
       const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        const raw = Buffer.concat(chunks).toString();
-        if (res.statusCode !== 200) {
-          resolve({ statusCode: res.statusCode, headers: corsHeaders(), body: raw.slice(0, 300) });
+      r.on('data', c => chunks.push(c));
+      r.on('end', () => {
+        if (r.statusCode !== 200) {
+          const raw = Buffer.concat(chunks).toString();
+          console.error('SpeechKit v1 error:', r.statusCode, raw.slice(0, 300));
+          resolve({ error: `${r.statusCode}: ${raw.slice(0, 200)}` });
           return;
         }
-        const audioParts = [];
-        for (const line of raw.split('\n')) {
-          const t = line.trim();
-          if (!t) continue;
-          try {
-            const obj  = JSON.parse(t);
-            const data = obj.result && obj.result.audioChunk && obj.result.audioChunk.data;
-            if (data) audioParts.push(Buffer.from(data, 'base64'));
-          } catch { }
-        }
-        if (!audioParts.length) {
-          resolve({ statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: 'No audio', raw: raw.slice(0, 200) }) });
-          return;
-        }
-        resolve({
-          statusCode: 200,
-          headers: { 'Content-Type': 'audio/mpeg', ...corsHeaders() },
-          body: Buffer.concat(audioParts).toString('base64'),
-          isBase64Encoded: true
-        });
+        resolve({ audio: Buffer.concat(chunks) });
       });
     });
 
-    req.on('error', e => resolve({ statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: e.message }) }));
+    req.on('error', e => resolve({ error: e.message }));
     req.write(body);
     req.end();
   });
-};
-
-function corsHeaders() {
-  return { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
 }
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (req.method !== 'POST')    { res.status(405).end(); return; }
+
+  const { text, voice = 'ermil', speed = '0.88', lang = 'ru-RU' } = req.body || {};
+  if (!text) { res.status(400).json({ error: 'text required' }); return; }
+
+  const API_KEY   = process.env.YANDEX_SPEECHKIT_KEY;
+  const FOLDER_ID = process.env.YANDEX_FOLDER_ID;
+
+  const textChunks = splitToChunks(text);
+  console.log(`TTS v1: ${textChunks.length} chunks, total ${text.length} chars, lang ${lang}`);
+
+  const results = await Promise.all(
+    textChunks.map(chunk => synthesizeChunk(chunk, voice, speed, lang, API_KEY, FOLDER_ID))
+  );
+
+  const allAudio = [];
+  for (const r of results) {
+    if (r.error) { res.status(400).json({ error: r.error }); return; }
+    allAudio.push(r.audio);
+  }
+
+  if (!allAudio.length) { res.status(500).json({ error: 'No audio data' }); return; }
+
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.send(Buffer.concat(allAudio));
+};

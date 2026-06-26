@@ -36,11 +36,11 @@ function splitToChunks(text) {
   return safe.length ? safe : [text.slice(0, MAX_CHARS)];
 }
 
-function synthesizeChunk(text, voice, speed, apiKey, folderId) {
+function synthesizeChunk(text, voice, speed, lang, apiKey, folderId) {
   return new Promise((resolve) => {
     const params = new URLSearchParams({
       text,
-      lang:     'ru-RU',
+      lang,
       voice,
       format:   'mp3',
       speed:    String(speed),
@@ -85,17 +85,17 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST')    { res.status(405).end(); return; }
 
-  const { text, voice = 'ermil', speed = '0.88' } = req.body || {};
+  const { text, voice = 'ermil', speed = '0.88', lang = 'ru-RU' } = req.body || {};
   if (!text) { res.status(400).json({ error: 'text required' }); return; }
 
   const API_KEY   = process.env.YANDEX_SPEECHKIT_KEY;
   const FOLDER_ID = process.env.YANDEX_FOLDER_ID;
 
   const textChunks = splitToChunks(text);
-  console.log(`TTS v1: ${textChunks.length} chunks, total ${text.length} chars`);
+  console.log(`TTS v1: ${textChunks.length} chunks, total ${text.length} chars, lang ${lang}`);
 
   const results = await Promise.all(
-    textChunks.map(chunk => synthesizeChunk(chunk, voice, speed, API_KEY, FOLDER_ID))
+    textChunks.map(chunk => synthesizeChunk(chunk, voice, speed, lang, API_KEY, FOLDER_ID))
   );
 
   const allAudio = [];
