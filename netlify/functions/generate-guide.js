@@ -44,6 +44,29 @@ function callGPT(systemText, userText, apiKey, folderId, maxTokens = '8000') {
   });
 }
 
+// Detect YandexGPT safety-filter refusals so they never leak into the guide.
+// These appear in Russian regardless of the requested guide language.
+function isRefusalParagraph(p) {
+  const t = p.toLowerCase().replace(/ё/g, 'е');
+  if (/не мог[уае][^.]{0,40}(обсужда|обсуди|говорить|ответ|помочь|поддержа|комментир|рассказыва)/.test(t)) return true;
+  if (/не готов[аы]?[^.]{0,40}(обсужда|говорить|отвеча)/.test(t)) return true;
+  if (/(давайте|давай)[^.]{0,30}(поговорим|сменим|обсудим|выбер)[^.]{0,40}(чем-нибудь|что-то друго|другую тему|другом)/.test(t)) return true;
+  if (/поговорим о чем-нибудь (другом|еще)/.test(t)) return true;
+  if (/(как )?(я )?(всего лишь |—\s*)?(языковая|нейросетевая|большая языковая) модель/.test(t)) return true;
+  if (/эта тема[^.]{0,30}(недоступна|слишком|чувствительн|деликатн)/.test(t)) return true;
+  if (/я не могу (обсуждать|говорить на) эт/.test(t)) return true;
+  return false;
+}
+
+function stripRefusals(text) {
+  if (!text) return '';
+  return text
+    .split(/\n{2,}/)
+    .filter(p => p.trim() && !isRefusalParagraph(p.trim()))
+    .join('\n\n')
+    .trim();
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -103,7 +126,8 @@ module.exports = async (req, res) => {
 — НЕЛЬЗЯ выдумывать объекты, здания, памятники, которых нет в данных.
 — Если объекта уже нет (снесён, утрачен) — это самое интересное: расскажи, что здесь было раньше и что с ним стало.
 — Легенды и предания — только с оговоркой "по преданию", "рассказывают, что".
-— Лучше честно описать характер места, чем придумать несуществующий объект.`;
+— Лучше честно описать характер места, чем придумать несуществующий объект.
+— НИКОГДА не пиши служебных фраз вроде «я не могу обсуждать эту тему», «давайте поговорим о другом», «как языковая модель». Ты — экскурсовод, а не чат-бот. Если какой-то объект кажется неудобным — просто спокойно расскажи исторический факт о нём из справки и веди слушателя дальше. Историческая справка о снесённом храме, заводе или мемориале — это нормально и уместно.`;
 
   // ─── LANGUAGE ──────────────────────────────────────────────────────────────
   const LANG_MAP = {
@@ -161,7 +185,7 @@ ${FORMAT}`;
       callGPT(SYS1, user1, API_KEY, FOLDER_ID),
       secondList ? callGPT(SYS2, user2, API_KEY, FOLDER_ID) : Promise.resolve('')
     ]);
-    text = [part1, part2].filter(Boolean).join('\n\n');
+    text = [stripRefusals(part1), stripRefusals(part2)].filter(Boolean).join('\n\n');
 
   } else {
     const SYS = `${PERSONA}
@@ -179,7 +203,7 @@ ${ACCURACY}
 Не выдумывай конкретные памятники и здания.
 
 ${FORMAT}`;
-    text = await callGPT(SYS, `Маршрут:\n${routeDescription}`, API_KEY, FOLDER_ID);
+    text = stripRefusals(await callGPT(SYS, `Маршрут:\n${routeDescription}`, API_KEY, FOLDER_ID));
   }
 
   if (!text) {
