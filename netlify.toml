@@ -6,3 +6,10 @@
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+# reverse-proxy Supabase through our own domain (bypass *.supabase.co blocking)
+[[redirects]]
+  from = "/sb/*"
+  to = "https://padzbdpbmdryltmlbdxw.supabase.co/:splat"
+  status = 200
+  force = true
