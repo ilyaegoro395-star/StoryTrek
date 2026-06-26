@@ -780,32 +780,7 @@ html, body {
     <div class="auth-logo">Story<span>Trek</span></div>
     <div class="auth-subtitle">Сохраняйте маршруты и слушайте гид на своём языке</div>
 
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="phone">📱 Телефон</button>
-      <button class="auth-tab" data-tab="email">✉️ Email</button>
-    </div>
-
-    <!-- Phone OTP -->
-    <div id="auth-tab-phone">
-      <div id="phone-step1">
-        <div class="auth-form-group">
-          <input id="auth-phone" class="auth-input" type="tel" placeholder="+7 999 123 45 67" autocomplete="tel">
-        </div>
-        <button id="auth-send-sms" class="auth-btn">Получить SMS код</button>
-      </div>
-      <div id="phone-step2" style="display:none">
-        <div id="auth-phone-hint" class="auth-hint"></div>
-        <div class="auth-form-group">
-          <input id="auth-otp" class="auth-input auth-otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
-        </div>
-        <button id="auth-verify-otp" class="auth-btn">Войти</button>
-        <button id="auth-back-phone" class="auth-btn-alt">← Изменить номер</button>
-      </div>
-    </div>
-
-    <!-- Email -->
-    <div id="auth-tab-email" style="display:none">
-      <div class="auth-mode-switch">
+    <div class="auth-mode-switch">
         <button class="auth-mode-btn active" data-mode="login">Войти</button>
         <button class="auth-mode-btn" data-mode="register">Регистрация</button>
       </div>
@@ -831,7 +806,6 @@ html, body {
         </div>
         <button id="auth-do-register" class="auth-btn">Создать аккаунт</button>
       </div>
-    </div>
 
     <div id="auth-error" class="auth-error" style="display:none"></div>
     <div id="auth-loader" class="auth-loader" style="display:none">Загрузка…</div>
@@ -2724,21 +2698,15 @@ document.getElementById('nav-profile').addEventListener('click', () => {
 addPanelSwipe(profilePanel, document.getElementById('profile-handle'), 'profile');
 
 /* ─── auth modal helpers ─── */
-function showAuthModal(defaultTab = 'phone') {
+function showAuthModal(defaultMode = 'login') {
   document.getElementById('auth-overlay').classList.remove('hidden');
-  switchAuthTab(defaultTab);
+  switchEmailMode(defaultMode);
   clearAuthUI();
 }
 
 function hideAuthModal() {
   document.getElementById('auth-overlay').classList.add('hidden');
   localStorage.setItem('st_visited', '1');
-}
-
-function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  document.getElementById('auth-tab-phone').style.display = tab === 'phone' ? 'block' : 'none';
-  document.getElementById('auth-tab-email').style.display = tab === 'email' ? 'block' : 'none';
 }
 
 function switchEmailMode(mode) {
@@ -2762,43 +2730,20 @@ function setAuthLoading(on) {
   document.getElementById('auth-error').style.display  = 'none';
 }
 
-/* ─── auth tab / mode switches ─── */
-document.querySelectorAll('.auth-tab').forEach(btn =>
-  btn.addEventListener('click', () => switchAuthTab(btn.dataset.tab)));
-
+/* ─── mode switches ─── */
 document.querySelectorAll('.auth-mode-btn').forEach(btn =>
   btn.addEventListener('click', () => switchEmailMode(btn.dataset.mode)));
 
-/* ─── phone OTP flow ─── */
-document.getElementById('auth-send-sms').addEventListener('click', async () => {
-  const phone = document.getElementById('auth-phone').value.trim();
-  if (!phone) { showAuthError('Введите номер телефона'); return; }
-  setAuthLoading(true);
-  const { error } = await sb.auth.signInWithOtp({ phone });
-  setAuthLoading(false);
-  if (error) { showAuthError(error.message); return; }
-  document.getElementById('phone-step1').style.display = 'none';
-  document.getElementById('phone-step2').style.display = 'block';
-  document.getElementById('auth-phone-hint').textContent = `Код отправлен на ${phone}`;
-});
-
-document.getElementById('auth-verify-otp').addEventListener('click', async () => {
-  const phone = document.getElementById('auth-phone').value.trim();
-  const token = document.getElementById('auth-otp').value.trim();
-  if (!token) { showAuthError('Введите код из SMS'); return; }
-  setAuthLoading(true);
-  const { error } = await sb.auth.verifyOtp({ phone, token, type: 'sms' });
-  setAuthLoading(false);
-  if (error) { showAuthError(error.message); return; }
-  hideAuthModal();
-});
-
-document.getElementById('auth-back-phone').addEventListener('click', () => {
-  document.getElementById('phone-step1').style.display = 'block';
-  document.getElementById('phone-step2').style.display = 'none';
-  document.getElementById('auth-otp').value = '';
-  clearAuthUI();
-});
+/* ─── translate Supabase errors ─── */
+function sbErr(msg) {
+  if (!msg) return 'Неизвестная ошибка';
+  if (msg.includes('Invalid login credentials'))  return 'Неверный email или пароль';
+  if (msg.includes('Email not confirmed'))         return 'Email не подтверждён. Войдите в Supabase Dashboard → Authentication → Settings и отключите «Confirm email», затем попробуйте снова.';
+  if (msg.includes('User already registered'))    return 'Аккаунт с таким email уже существует. Войдите через «Войти».';
+  if (msg.includes('Password should be'))         return 'Пароль слишком короткий (минимум 6 символов)';
+  if (msg.includes('Unable to validate'))         return 'Неверный формат email';
+  return msg;
+}
 
 /* ─── email login ─── */
 document.getElementById('auth-do-login').addEventListener('click', async () => {
@@ -2808,7 +2753,7 @@ document.getElementById('auth-do-login').addEventListener('click', async () => {
   setAuthLoading(true);
   const { error } = await sb.auth.signInWithPassword({ email, password: pass });
   setAuthLoading(false);
-  if (error) { showAuthError(error.message === 'Invalid login credentials' ? 'Неверный email или пароль' : error.message); return; }
+  if (error) { showAuthError(sbErr(error.message)); return; }
   hideAuthModal();
 });
 
@@ -2826,12 +2771,31 @@ document.getElementById('auth-do-register').addEventListener('click', async () =
     options: { data: { first_name: fname, last_name: lname } }
   });
   setAuthLoading(false);
-  if (error) { showAuthError(error.message); return; }
-  if (data.user) {
-    await sb.from('profiles').upsert({ id: data.user.id, first_name: fname, last_name: lname, email });
+  if (error) { showAuthError(sbErr(error.message)); return; }
+
+  const userId = data.user?.id;
+  if (userId) {
+    await sb.from('profiles').upsert({ id: userId, first_name: fname, last_name: lname, email });
   }
-  hideAuthModal();
-  setStatus('Аккаунт создан! Проверьте email для подтверждения.', 'info');
+
+  // data.session is non-null when email confirmation is disabled in Supabase →
+  // the user is already signed in and onAuthStateChange will fire.
+  if (data.session) {
+    hideAuthModal();
+    setStatus('Добро пожаловать!', 'info');
+  } else {
+    // email confirmation required — sign them in right now anyway
+    setAuthLoading(true);
+    const { error: loginErr } = await sb.auth.signInWithPassword({ email, password: pass });
+    setAuthLoading(false);
+    if (loginErr) {
+      // confirmation genuinely required → show friendly message
+      showAuthError('Аккаунт создан. Проверьте email и нажмите ссылку для подтверждения, затем войдите.');
+    } else {
+      hideAuthModal();
+      setStatus('Добро пожаловать!', 'info');
+    }
+  }
 });
 
 document.getElementById('auth-skip').addEventListener('click', hideAuthModal);
@@ -2879,14 +2843,12 @@ async function loadUserProfile() {
 /* ─── profile panel buttons ─── */
 document.getElementById('pf-btn-login').addEventListener('click', () => {
   hideProfilePanel();
-  showAuthModal('email');
-  switchEmailMode('login');
+  showAuthModal('login');
 });
 
 document.getElementById('pf-btn-register').addEventListener('click', () => {
   hideProfilePanel();
-  showAuthModal('email');
-  switchEmailMode('register');
+  showAuthModal('register');
 });
 
 document.querySelectorAll('.lang-btn').forEach(btn => {
