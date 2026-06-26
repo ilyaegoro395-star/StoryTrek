@@ -1088,6 +1088,7 @@ async function useMyLoc() {
 /* ─── panel open/close ─── */
 const card         = document.getElementById('card');
 const explorePanel = document.getElementById('explore-panel');
+const profilePanel = document.getElementById('profile-panel');
 const NAV_H        = 64;
 
 function updateFab() {
@@ -2689,12 +2690,13 @@ document.getElementById('dist-filter').addEventListener('click', e => {
 
 const SUPABASE_URL = 'https://padzbdpbmdryltmlbdxw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_YzCEgbmIYTTYfTLTpBeZAA_yfDgvpkS';
-const sb           = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// guard: if the Supabase CDN is blocked/unreachable, don't crash the whole app
+const sb = (typeof supabase !== 'undefined' && supabase.createClient)
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 
 let sbUser        = null;
 let guideLanguage = localStorage.getItem('st_lang') || 'ru';
-
-const profilePanel = document.getElementById('profile-panel');
 
 /* ─── profile panel open / hide ─── */
 function openProfilePanel() {
@@ -2925,6 +2927,7 @@ document.getElementById('pf-signout').addEventListener('click', async () => {
 
 /* ─── Supabase init ─── */
 async function initAuth() {
+  if (!sb) { updateNavProfileState(); return; }   // CDN blocked — auth disabled, app still works
   const { data: { session } } = await sb.auth.getSession();
   sbUser = session?.user || null;
   if (sbUser) await loadUserProfile();
