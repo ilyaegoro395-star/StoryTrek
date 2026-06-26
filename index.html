@@ -6,7 +6,9 @@
 <title>StoryTrek</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- non-render-blocking: if Google Fonts is throttled/blocked, the page still renders with the system fallback -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
 :root {
   --bg:            #F0F9FF;
@@ -904,7 +906,7 @@ html, body {
   </button>
 </nav>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/vendor/supabase.min.js"></script>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=6a51cb53-ed6a-4d80-b294-bc082028e4ac&lang=ru_RU&load=package.full" type="text/javascript"></script>
 <script>
 'use strict';
@@ -2704,7 +2706,14 @@ document.getElementById('dist-filter').addEventListener('click', e => {
    SUPABASE / AUTH / PROFILE
    ═══════════════════════════════════════════════════════════ */
 
-const SUPABASE_URL = 'https://padzbdpbmdryltmlbdxw.supabase.co';
+// Route Supabase through our own (Cloudflare-proxied) domain so Russian ISPs
+// never see a *.supabase.co request. /sb/* is reverse-proxied to Supabase by
+// vercel.json rewrites (and netlify.toml redirects). Falls back to the direct
+// URL on origins without the proxy (e.g. local file://).
+const SUPABASE_DIRECT = 'https://padzbdpbmdryltmlbdxw.supabase.co';
+const SUPABASE_URL = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin + '/sb'
+  : SUPABASE_DIRECT;
 const SUPABASE_KEY = 'sb_publishable_YzCEgbmIYTTYfTLTpBeZAA_yfDgvpkS';
 // guard: if the Supabase CDN is blocked/unreachable, don't crash the whole app
 const sb = (typeof supabase !== 'undefined' && supabase.createClient)
@@ -2976,19 +2985,26 @@ document.getElementById('pf-signout').addEventListener('click', async () => {
 
 /* ─── Supabase init ─── */
 async function initAuth() {
-  if (!sb) { updateNavProfileState(); return; }   // CDN blocked — auth disabled, app still works
-  const { data: { session } } = await sb.auth.getSession();
-  sbUser = session?.user || null;
-  if (sbUser) await loadUserProfile();
+  if (!sb) { updateNavProfileState(); return; }   // library unavailable — auth disabled, app still works
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    sbUser = session?.user || null;
+    if (sbUser) await loadUserProfile();
+  } catch (e) {
+    console.error('auth init failed (network?):', e?.message);
+    sbUser = null;
+  }
   updateNavProfileState();
 
-  sb.auth.onAuthStateChange(async (_event, session) => {
-    const hadUser = !!sbUser;
-    sbUser = session?.user || null;
-    if (sbUser && !hadUser) await loadUserProfile();
-    updateNavProfileState();
-    if (profilePanel.classList.contains('open')) renderProfilePanel();
-  });
+  try {
+    sb.auth.onAuthStateChange(async (_event, session) => {
+      const hadUser = !!sbUser;
+      sbUser = session?.user || null;
+      if (sbUser && !hadUser) await loadUserProfile();
+      updateNavProfileState();
+      if (profilePanel.classList.contains('open')) renderProfilePanel();
+    });
+  } catch (e) { console.error('onAuthStateChange failed:', e?.message); }
 
   // first visit → show auth modal after map is ready
   if (!localStorage.getItem('st_visited') && !sbUser) {
