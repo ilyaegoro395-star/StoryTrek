@@ -1,0 +1,126 @@
+name: Deploy to Yandex Cloud
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Deploys the StoryTrek SPA to Yandex Cloud:
+#   • 4 serverless functions  (api/* logic, wrapped by yc-adapter.js)
+#   • static site             → Object Storage bucket
+#   • routing                 → API Gateway (/api/* → functions, /* → bucket)
+#
+# Required GitHub secrets (see DEPLOY-YANDEX.md for how to obtain each):
+#   YC_SA_JSON_CREDENTIALS  – service-account authorized key (JSON)
+#   YC_SA_ID                – service-account id (used by the gateway integrations)
+#   YC_BUCKET               – Object Storage bucket name
+#   YC_STORAGE_KEY_ID       – static access key id  (for s3 upload)
+#   YC_STORAGE_SECRET       – static access key secret
+#   YC_GATEWAY_ID           – API Gateway id
+#   FN_GEOCODE_ID / FN_GUIDE_ID / FN_SYNTH_ID / FN_ROUTE_ID – function ids
+#   YANDEX_GPT_KEY / YANDEX_SPEECHKIT_KEY / YANDEX_FOLDER_ID – function env vars
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ─── functions ────────────────────────────────────────────────────────
+      - name: Deploy geocode function
+        uses: yc-actions/yc-sls-function@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          function-id: ${{ secrets.FN_GEOCODE_ID }}
+          runtime: nodejs18
+          entrypoint: fn-geocode.handler
+          memory: 256Mb
+          execution-timeout: 15
+          include: |
+            yc-adapter.js
+            fn-geocode.js
+            api/geocode.js
+
+      - name: Deploy generate-guide function
+        uses: yc-actions/yc-sls-function@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          function-id: ${{ secrets.FN_GUIDE_ID }}
+          runtime: nodejs18
+          entrypoint: fn-generate-guide.handler
+          memory: 256Mb
+          execution-timeout: 60
+          environment: |
+            YANDEX_GPT_KEY=${{ secrets.YANDEX_GPT_KEY }}
+            YANDEX_FOLDER_ID=${{ secrets.YANDEX_FOLDER_ID }}
+          include: |
+            yc-adapter.js
+            fn-generate-guide.js
+            api/generate-guide.js
+
+      - name: Deploy synthesize function
+        uses: yc-actions/yc-sls-function@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          function-id: ${{ secrets.FN_SYNTH_ID }}
+          runtime: nodejs18
+          entrypoint: fn-synthesize.handler
+          memory: 256Mb
+          execution-timeout: 30
+          environment: |
+            YANDEX_SPEECHKIT_KEY=${{ secrets.YANDEX_SPEECHKIT_KEY }}
+            YANDEX_FOLDER_ID=${{ secrets.YANDEX_FOLDER_ID }}
+          include: |
+            yc-adapter.js
+            fn-synthesize.js
+            api/synthesize.js
+
+      - name: Deploy route function
+        uses: yc-actions/yc-sls-function@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          function-id: ${{ secrets.FN_ROUTE_ID }}
+          runtime: nodejs18
+          entrypoint: fn-route.handler
+          memory: 256Mb
+          execution-timeout: 30
+          include: |
+            yc-adapter.js
+            fn-route.js
+            api/route.js
+
+      # ─── static site → Object Storage ─────────────────────────────────────
+      - name: Upload static files to Object Storage
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.YC_STORAGE_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_STORAGE_SECRET }}
+          AWS_DEFAULT_REGION:    ru-central1
+          BUCKET:                ${{ secrets.YC_BUCKET }}
+        run: |
+          ENDPOINT=https://storage.yandexcloud.net
+          # index.html – no cache so updates show up immediately
+          aws --endpoint-url=$ENDPOINT s3 cp index.html "s3://$BUCKET/index.html" \
+            --content-type "text/html; charset=utf-8" --cache-control "no-cache"
+          # vendored assets – long cache
+          aws --endpoint-url=$ENDPOINT s3 cp vendor/ "s3://$BUCKET/vendor/" \
+            --recursive --cache-control "public,max-age=31536000"
+
+      # ─── API Gateway (routing) ────────────────────────────────────────────
+      - name: Render gateway spec
+        env:
+          FN_GEOCODE_ID: ${{ secrets.FN_GEOCODE_ID }}
+          FN_GUIDE_ID:   ${{ secrets.FN_GUIDE_ID }}
+          FN_SYNTH_ID:   ${{ secrets.FN_SYNTH_ID }}
+          FN_ROUTE_ID:   ${{ secrets.FN_ROUTE_ID }}
+          YC_BUCKET:     ${{ secrets.YC_BUCKET }}
+          YC_SA_ID:      ${{ secrets.YC_SA_ID }}
+        run: |
+          envsubst < api-gateway.yaml > api-gateway.rendered.yaml
+          echo "── rendered spec ──"; cat api-gateway.rendered.yaml
+
+      - name: Deploy API Gateway
+        uses: yc-actions/yc-api-gateway@v2
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          gateway-id: ${{ secrets.YC_GATEWAY_ID }}
+          spec-file: api-gateway.rendered.yaml

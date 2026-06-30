@@ -1,0 +1,102 @@
+openapi: 3.0.0
+info:
+  title: storytrek
+  version: 1.0.0
+
+# Placeholders ${...} are substituted by the GitHub Actions workflow (envsubst)
+# before the spec is uploaded to the API Gateway.
+
+paths:
+  /api/geocode:
+    get:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_GEOCODE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+    options:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_GEOCODE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+
+  /api/generate-guide:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_GUIDE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+    options:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_GUIDE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+
+  /api/synthesize:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_SYNTH_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+    options:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_SYNTH_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+
+  /api/route:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_ROUTE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+    options:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${FN_ROUTE_ID}
+        tag: $latest
+        service_account_id: ${YC_SA_ID}
+
+  # Supabase reverse-proxy: keeps auth/db calls on the (Russia-reachable)
+  # gateway domain instead of the blocked *.supabase.co. Unlike a Vercel
+  # rewrite, the API Gateway http integration forwards the Authorization header.
+  /sb/{path+}:
+    parameters:
+      - { name: path, in: path, required: true, schema: { type: string } }
+    get: &sb
+      x-yc-apigateway-integration:
+        type: http
+        url: https://padzbdpbmdryltmlbdxw.supabase.co/{path}
+    post:   *sb
+    put:    *sb
+    patch:  *sb
+    delete: *sb
+    options: *sb
+
+  /:
+    get:
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${YC_BUCKET}
+        object: index.html
+        service_account_id: ${YC_SA_ID}
+
+  /{file+}:
+    get:
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${YC_BUCKET}
+        object: '{file}'
+        service_account_id: ${YC_SA_ID}
